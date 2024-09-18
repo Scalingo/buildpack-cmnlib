@@ -55,55 +55,69 @@ Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 
 #### **`cmnlib::start`**
 
-Marks the begining of the buildpack.\
-Calls [`cmnlib::trap_setup`](#cmnlibtrap_setup).
+Marks the begining of the buildpack.
+
+Calls:
+- [`cmnlib::trap_setup`](#cmnlibtrap_setup).
 
 #### **`cmnlib::finish`**
 
 Outputs a success message and exits with a `0` return code, thus instructing
 the platform that the buildpack ran successfully.\
 Use this function as the last instruction of the buildpack, when it
-succeeded.\
-Calls [`cmnlib::trap_teardown`](#cmnlibtrap_teardown).
+succeeded.
+
+Calls:
+- [`cmnlib::trap_teardown`](#cmnlibtrap_teardown).
 
 #### **`cmnlib::fail`**
 
 Outputs an error message and exits with a `1` return code, thus instructing
-the platform that the buildpack failed (and so did the build).\
-Calls [`cmnlib::trap_teardown`](#cmnlibtrap_teardown).
+the platform that the buildpack failed (and so did the build).
+
+Calls:
+- [`cmnlib::trap_teardown`](#cmnlibtrap_teardown).
 
 #### **`cmnlib::step_start`**
 
 Outputs a message marking the beginning of a buildpack *step*. A step is a
-group of *tasks* that are logically bound.\
-Use this function when the step is about to start.
+group of *tasks* that are logically bound.
+
+:bulb: Use this function when the step is about to start.
 
 #### **`cmnlib::step_finish`**
 
-Outputs a success message marking the end of a buildpack step.\
-Use this function when the step succeeded.
+Outputs a success message marking the end of a buildpack step.
+
+:bulb: Use this function when the step succeeded.
 
 #### **`cmnlib::step_fail`**
 
-Outputs an error message marking the end of a buildpack step.\
-Use this function when the step failed.
+Outputs an error message marking the end of a buildpack step.
+
+:bulb: Use this function when the step failed.
 
 #### **`cmnlib::task_start`**
 
 Outputs a message marking the beginning of a buildpack *task*. A task is a
-single instruction, such as downloading a file, extracting an archive, ...\
-Use this function when the task is about to start.
+single instruction, such as downloading a file, extracting an archive, ...
+
+:bulb: Use this function when the task is about to start.
 
 #### **`cmnlib::task_finish`**
 
-Outputs a success message marking the end of a task.\
-Use this function when the task succeeded.
+Outputs a success message marking the end of a task.
+
+:bulb: Use this function when the task succeeded.
 
 #### **`cmnlib::task_fail`**
 
-Outputs an error message marking the end of a task.\
-Use this function when the task failed.\
-Calls [`cmnlib::err`](#cmnliberr) with `$1` when `$1` is set.
+Outputs an error message marking the end of a task.
+
+:bulb: Use this function when the task failed.
+
+Calls:
+- [`cmnlib::err`](#cmnliberr) with `$1` when `$1` is set.
 
 
 ### Utilities
@@ -171,13 +185,17 @@ cmnlib::str_join "-" "one" "two" "three" "four"
 
 Reads and exports environment variables stored as files in `$ENV_DIR`.\
 Use towards the beginning of the buildpack, especially if it can be called
-after another buildpack (with a multi-buildpack).\
-Calls [`cmnlib::list_env_vars`](#cmnliblist_env_vars).
+after another buildpack (with a multi-buildpack).
+
+Calls:
+- [`cmnlib::list_env_vars`](#cmnliblist_env_vars).
 
 #### **`cmnlib::list_env_vars`**
 
 Lists available environement variables stored as files in `$ENV_DIR`.\
 A few environment variables are ignored: `PATH`, `GIT_DIR`, `CPATH`, `CPPATH`,
 `LD_PRELOAD`, `LIBRARY_PATH`, `LD_LIBRARY_PATH`, `JAVA_OPTS`,
-`JAVA_TOOL_OPTIONS`, `BUILDPACK_URL` and `BUILD_DIR`.\
-Calls [`cmnlib::str_join`](#cmnlibstr_join).
+`JAVA_TOOL_OPTIONS`, `BUILDPACK_URL` and `BUILD_DIR`.
+
+Calls:
+- [`cmnlib::str_join`](#cmnlibstr_join).
