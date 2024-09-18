@@ -55,7 +55,7 @@ Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 #### **`cmnlib::start`**
 
 Marks the begining of the buildpack.\
-Calls `cmnlib::trap_setup`.
+Calls [`cmnlib::trap_setup`](#cmnlibtrap_setup).
 
 #### **`cmnlib::finish`**
 
@@ -63,13 +63,13 @@ Outputs a success message and exits with a `0` return code, thus instructing
 the platform that the buildpack ran successfully.\
 Use this function as the last instruction of the buildpack, when it
 succeeded.\
-Calls `cmnlib::trap_teardown`.
+Calls [`cmnlib::trap_teardown`](#cmnlibtrap_teardown).
 
 #### **`cmnlib::fail`**
 
 Outputs an error message and exits with a `1` return code, thus instructing
 the platform that the buildpack failed (and so did the build).\
-Calls `cmnlib::trap_teardown`.
+Calls [`cmnlib::trap_teardown`](#cmnlibtrap_teardown).
 
 #### **`cmnlib::step_start`**
 
@@ -102,7 +102,7 @@ Use this function when the task succeeded.
 
 Outputs an error message marking the end of a task.\
 Use this function when the task failed.\
-Calls `cmnlib::err` with `$1` when `$1` is set.
+Calls [`cmnlib::err`](#cmnliberr) with `$1` when `$1` is set.
 
 
 ### Utilities
@@ -171,11 +171,12 @@ cmnlib::str_join "-" "one" "two" "three" "four"
 Reads and exports environment variables stored as files in `$ENV_DIR`.\
 Use towards the beginning of the buildpack, especially if it can be called
 after another buildpack (with a multi-buildpack).\
-Calls `cmnlib::list_env_vars`.
+Calls [`cmnlib::list_env_vars`](#cmnliblist_env_vars).
 
 #### **`cmnlib::list_env_vars`**
 
 Lists available environement variables stored as files in `$ENV_DIR`.\
 A few environment variables are ignored: `PATH`, `GIT_DIR`, `CPATH`, `CPPATH`,
 `LD_PRELOAD`, `LIBRARY_PATH`, `LD_LIBRARY_PATH`, `JAVA_OPTS`,
-`JAVA_TOOL_OPTIONS`, `BUILDPACK_URL` and `BUILD_DIR`
+`JAVA_TOOL_OPTIONS`, `BUILDPACK_URL` and `BUILD_DIR`.\
+Calls [`cmnlib::str_join`](#cmnlibstr_join).
