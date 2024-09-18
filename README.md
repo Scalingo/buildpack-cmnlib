@@ -42,7 +42,8 @@ Outputs an error message on both `stdout` and `stderr`.
 #### **`cmnlib::trap_setup`**
 
 Instructs the buildpack to catch the `EXIT`, `SIGHUP`, `SIGINT`, `SIGQUIT`,
-`SIGABRT`, and `SIGTERM` signals and to call `cmnlib::fail` when it happens.
+`SIGABRT`, and `SIGTERM` signals and to call [`cmnlib::fail`](#cmnlibfail) when
+it happens.
 
 #### **`cmnlib::trap_teardown`**
 
