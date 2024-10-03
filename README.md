@@ -23,16 +23,13 @@ source /dev/stdin <<< "$( curl --silent --location --retry 3 "https://<s3_url>/<
 
 ### Output Functions
 
-All output functions can be called with either a string argument or with a Bash
-heredoc.
-
 #### **`cmn::output::info`**
 
 Outputs an informational message on `stdout`.
 
 Can be called with a string argument or with a Bash heredoc.
 
-:bulb: Examples:
+##### :bulb: Examples:
 
 ```bash
 # Calling:
@@ -60,13 +57,12 @@ Outputs a warning message on `stdout`.
 
 Can be called with a string argument or with a Bash heredoc.
 
-:bulb: Examples:
-
+##### :bulb: Examples:
 ```bash
 # Calling:
 cmn::output::warn "This is a warning."
 
-# Would output:
+Would output:
  !      This is a warning.
 ```
 
@@ -88,10 +84,11 @@ Outputs an error message on both `stdout` and `stderr`.
 
 Can be called with a string argument or with a Bash heredoc.
 
-When the`DEBUG` environment variable is set (to any value), prints out
-a traceback.
+> [!TIP]
+> When the`DEBUG` environment variable is set (to any value), prints out
+  a traceback.
 
-:bulb: Examples:
+##### :bulb: Examples:
 
 ```bash
 # Calling:
@@ -130,9 +127,10 @@ Outputs a debug message on `stdout`.
 
 Can be called with a string argument or with a Bash heredoc.
 
-**Only prints out when the `DEBUG` environment variable is set (to any value).**
+> [!WARNING]
+> Only prints out when the `DEBUG` environment variable is set (to any value).
 
-:bulb: Example:
+##### :bulb: Examples:
 
 ```bash
 # Calling:
@@ -170,8 +168,8 @@ cmn::output::debug <<- EOM
 #### **`cmn::trap::setup`**
 
 Instructs the buildpack to catch the `EXIT`, `SIGHUP`, `SIGINT`, `SIGQUIT`,
-`SIGABRT`, and `SIGTERM` signals and to call [`cmn::fail`](#cmnfail) when
-it happens.
+`SIGABRT`, and `SIGTERM` signals and to call [`cmn::bp::fail`](#cmnbpfail)
+when it happens.
 
 #### **`cmn::trap::teardown`**
 
@@ -179,7 +177,7 @@ Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
 
 
-### Flow
+### Flow Functions
 
 #### **`cmn::bp::start`**
 
@@ -187,17 +185,19 @@ Marks the begining of the buildpack.
 
 Calls [`cmn::trap::setup`](#cmntrapsetup).
 
-:point_right: Use this function at the beginning of the buildpack.
+> [!TIP]
+> Use this function at the beginning of the buildpack.
 
 #### **`cmn::bp::finish`**
 
 Outputs a success message and exits with a `0` return code, thus instructing
 the platform that the buildpack ran successfully.
 
-:point_right: Use this function as the last instruction of the buildpack, when
-it succeeded.
-
 Calls [`cmn::trap::teardown`](#cmntrapteardown).
+
+> [!TIP]
+> Use this function as the last instruction of the buildpack, when it
+  succeeded.
 
 #### **`cmnlib::bp::fail`**
 
@@ -206,67 +206,69 @@ the platform that the buildpack failed (and so did the build).
 
 Calls [`cmn::trap::teardown`](#cmntrapteardown).
 
-:point_right: Use this function as the last instruction of the buildpack, when
-it failed.
+> [!TIP]
+> Use this function as the last instruction of the buildpack, when it failed.
 
 #### **`cmn::step::start`**
 
 Outputs a message marking the beginning of a buildpack *step*. A step is a
 group of *tasks* that are logically bound.
 
-:point_right: Use this function when the step is about to start.
+> [!TIP]
+> Use this function when the step is about to start.
 
 #### **`cmn::step::finish`**
 
 Outputs a success message marking the end of a buildpack step.
 
-:point_right: Use this function when the step succeeded.
+> [!TIP]
+> Use this function when the step succeeded.
 
 #### **`cmn::step::fail`**
 
 Outputs an error message marking the end of a buildpack step.
 
-:point_right: Use this function when the step failed.
+> [!TIP]
+> Use this function when the step failed.
 
 #### **`cmn::task::start`**
 
 Outputs a message marking the beginning of a buildpack *task*. A task is a
 single instruction, such as downloading a file, extracting an archive, ...
 
-:point_right: Use this function when the task is about to start.
+> [!TIP]
+> Use this function when the task is about to start.
 
 #### **`cmn::task::finish`**
 
 Outputs a success message marking the end of a task.
 
-:point_right: Use this function when the task succeeded.
+> [!TIP]
+> Use this function when the task succeeded.
 
 #### **`cmn::task::fail`**
 
 Outputs an error message marking the end of a task.
 
-:point_right: Use this function when the task failed.
-
 Calls [`cmn::ouput::err`](#cmnoutputerr) with `$1` when `$1` is set.
 
+> [!TIP]
+> Use this function when the task failed.
 
-### Utilities
+
+
+### File Functions
 
 #### **`cmn::file::sum`**
 
 Computes the checksum of the given file.
 
-Arguments:
-- $1: file: file for which we want to compute a checksum
-- $2: hash_algo: hashing algorithm (currently `md5`, `sha1` and `sha256` are
-  supported)
-
-:bulb: Example:
+##### :bulb: Example:
 
 ```bash
 file="file.tar.gz"
 
-checksum="$( cmn::file::check_sum "${file}" )"
+checksum="$( cmn::file::sum "${file}" )"
 ```
 
 #### **`cmn::file::check_checksum`**
@@ -277,7 +279,7 @@ the reference file.\
 
 Calls [`cmn::file::sum`](#cmnfilesum).
 
-:bulb: Example:
+##### :bulb: Example:
 
 ```bash
 file="file.tar.gz"
@@ -302,7 +304,8 @@ cmn::task::finish
 
 Downloads the file pointed by the given URL and stores it at the given path.
 
-:bulb: Example:
+##### :bulb: Example:
+
 ```bash
 file="https://example.org/file.tar.gz"
 output="${CACHE_DIR}/file.tar.gz"
@@ -325,7 +328,8 @@ cmn::task::finish
 Outputs a string by joining all the arguments, separated by the given
 separator.
 
-:bulb: Example:
+##### :bulb: Examples:
+
 ```bash
 # With:
 arr=( "one" "two" "three" )
@@ -362,3 +366,4 @@ A few environment variables are ignored: `PATH`, `GIT_DIR`, `CPATH`, `CPPATH`,
 `JAVA_TOOL_OPTIONS`, `BUILDPACK_URL` and `BUILD_DIR`.
 
 Calls [`cmn::str::join`](#cmnstrjoin).
+
