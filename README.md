@@ -208,7 +208,7 @@ Calls [`cmn::trap::teardown`](#cmntrapteardown).
 > Use this function as the last instruction of the buildpack, when it
   succeeded.
 
-#### **`cmnlib::main::fail`**
+#### **`cmn::main::fail`**
 
 Outputs an error message and exits with a `1` return code, thus instructing
 the platform that the buildpack failed (and so did the build).
@@ -340,7 +340,9 @@ cmn::str::join "," "${arr[@]}"
 
 # Would output:
 one,two,three
+```
 
+```bash
 # Calling:
 cmn::str::join "-" "one" "two" "three" "four"
 
