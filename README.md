@@ -16,7 +16,7 @@ the buildpack to download and import the library:
 
 ```bash
 declare -F cmn::output::info >/dev/null \
-    || source /dev/stdin <<< "$( curl --silent --location --retry 3 "https://<s3_url>/<bucket>/<version>/std.sh" )" \
+    || source /dev/stdin <<< "$( curl --silent --location --retry 3 "https://<s3_url>/<bucket>/<version>/cmnlib.sh" )" \
         || { printf "Unable to load cmnlib, aborting." >&2; exit 1; }
 ```
 

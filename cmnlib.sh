@@ -151,15 +151,15 @@ cmn::file::check_checksum() {
 
 	case "${hash_algo}" in
 		"sha1")
-			shasum --algorithm 1 --check --status <<< "${hash} ${file}"
+			shasum --algorithm 1 --check --status <<< "${hash}  ${file}"
 			rc="${?}"
 			;;
 		"sha256")
-			shasum --algorithm 256 --check --status <<< "${hash} ${file}"
+			shasum --algorithm 256 --check --status <<< "${hash}  ${file}"
 			rc="${?}"
 			;;
 		"md5")
-		    md5sum --check --status <<< "${hash} ${file}"
+		    md5sum --check --status <<< "${hash}  ${file}"
 			rc="${?}"
 			;;
 		*)
