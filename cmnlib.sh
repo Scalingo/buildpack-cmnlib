@@ -73,7 +73,7 @@ cmn::output::debug() {
 
 
 cmn::trap::setup() {
-	trap cmn::bp::fail EXIT SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+	trap cmn::main::fail EXIT SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
 }
 
 cmn::trap::teardown() {
@@ -82,17 +82,17 @@ cmn::trap::teardown() {
 
 
 
-cmn::bp::start() {
+cmn::main::start() {
 	cmn::trap::setup
 }
 
-cmn::bp::finish() {
+cmn::main::finish() {
 	cmn::trap::teardown
 	printf "\n%b%b%b\n" "${GREEN}" "All done." "${NC}"
 	exit 0
 }
 
-cmn::bp::fail() {
+cmn::main::fail() {
 	cmn::trap::teardown
 	printf "\n%b%b%b\n" "${RED}" "Failed." "${NC}" >&2
 	exit 1
@@ -136,54 +136,36 @@ cmn::file::check_checksum() {
 	local rc
 
 	local file
-	local file_checksum
 
 	local hash_file
 	local hash_algo
 	local hash
 
 	rc=1
-	file="${1}"
-	hash_file="${2}"
+	file="${1}"; shift
+	hash_file="${1}"; shift
 
 	hash_algo="${hash_file##*.}"
 
-	if file_checksum="$( cmn::file::sum "${file}" "${hash_algo}" )"; then
-		hash="$( cat "${hash_file}" )"
-
-		if [ "${file_checksum}" = "${hash}" ]; then
-			rc=0
-		else
-			rm --force "${file}"
-		fi
-	fi
-
-	return "${rc}"
-}
-
-cmn::file::sum() {
-	local checksum
-	local rc=0
-
-	local file="${1}"
-	local hash_algo="${2}"
+	hash="$( cut -d " " -f 1 < "${hash_file}" )"
 
 	case "${hash_algo}" in
 		"sha1")
-			checksum="$( shasum -a 1 "${file}" | cut -d " " -f 1 )"
+			shasum --algorithm 1 --check --status <<< "${hash} ${file}"
+			rc="${?}"
 			;;
 		"sha256")
-			checksum="$( shasum -a 256 "${file}" | cut -d " " -f 1 )"
+			shasum --algorithm 256 --check --status <<< "${hash} ${file}"
+			rc="${?}"
 			;;
 		"md5")
-			checksum="$( md5sum "${file}" | cut -d " " -f 1 )"
+		    md5sum --check --status <<< "${hash} ${file}"
+			rc="${?}"
 			;;
 		*)
 			rc=2
 			;;
 	esac
-
-	printf "%s" "${checksum}"
 
 	return "${rc}"
 }
@@ -194,8 +176,8 @@ cmn::file::download() {
 	local cached
 
 	rc=1
-	url="${1}"
-	cached="${2}"
+	url="${1}"; shift
+	cached="${1}"; shift
 
 	if curl --silent --retry 3 --location "${url}" --output "${cached}"; then
 		rc=0
@@ -262,6 +244,50 @@ cmn::env::list() {
 
 
 
+cmn::bp::run() {
+	local rc
+	local buildpack_url
+	local build_dir
+	local cache_dir
+	local env_dir
+
+	rc=1
+	buildpack_url="${1}"; shift
+	build_dir="${1}"; shift
+	cache_dir="${1}"; shift
+	env_dir="${1}"; shift
+
+	local bp_dir
+	bp_dir="$( mktemp --directory sub_buildpack_XXXXX )"
+
+	# If the repo is not reachable, fail instead of asking for credentials
+	if ! GIT_TERMINAL_PROMPT=0 \
+			git clone --quiet --depth=1 "${buildpack_url}" "${bp_dir}" \
+				2>/dev/null
+	then
+		rc=2
+	else
+		if ! "${bp_dir}/bin/compile" "${build_dir}" "${cache_dir}" "${env_dir}"
+		then
+			rc="${?}"
+		else
+			# Source `export` file if it exists:
+			if [[ -f "${bp_dir}/export" ]]; then
+				source "${bp_dir}/export"
+			fi
+
+			# Silently remove the buildpack temporary directory:
+			rm --recursive --force "${bp_dir}"
+
+			rc=0
+		fi
+	fi
+
+	return "${rc}"
+}
+
+
+
 readonly -f cmn::output::info
 readonly -f cmn::output::warn
 readonly -f cmn::output::err
@@ -269,9 +295,9 @@ readonly -f cmn::output::err
 readonly -f cmn::trap::setup
 readonly -f cmn::trap::teardown
 
-readonly -f cmn::bp::start
-readonly -f cmn::bp::finish
-readonly -f cmn::bp::fail
+readonly -f cmn::main::start
+readonly -f cmn::main::finish
+readonly -f cmn::main::fail
 
 readonly -f cmn::step::start
 readonly -f cmn::step::finish
@@ -282,10 +308,11 @@ readonly -f cmn::task::finish
 readonly -f cmn::task::fail
 
 readonly -f cmn::file::check_checksum
-readonly -f cmn::file::sum
 readonly -f cmn::file::download
 
 readonly -f cmn::str::join
 
 readonly -f cmn::env::read
 readonly -f cmn::env::list
+
+readonly -f cmn::bp::run

@@ -15,9 +15,11 @@ Place the following instruction towards the top of the `bin/compile` file of
 the buildpack to download and import the library:
 
 ```bash
-source /dev/stdin <<< "$( curl --silent --location --retry 3 "https://<s3_url>/<bucket>/<version>/std.sh" )" \
-    || { printf "Unable to load cmnlib, aborting." >&2; exit 1; }
+declare -F cmn::output::info >/dev/null \
+    || source /dev/stdin <<< "$( curl --silent --location --retry 3 "https://<s3_url>/<bucket>/<version>/std.sh" )" \
+        || { printf "Unable to load cmnlib, aborting." >&2; exit 1; }
 ```
+
 
 ## Using the Library
 
@@ -25,11 +27,11 @@ source /dev/stdin <<< "$( curl --silent --location --retry 3 "https://<s3_url>/<
 
 #### **`cmn::output::info`**
 
-Outputs an informational message on `stdout`.
-
+Outputs an informational message on `stdout`.\
 Can be called with a string argument or with a Bash heredoc.
 
-##### :bulb: Examples:
+<details>
+<summary>Examples</summary>
 
 ```bash
 # Calling:
@@ -50,14 +52,16 @@ cmn::output::info <<- EOM
         This is an informative message.
         That should be useful to understand what's going on.
 ```
+</details>
 
 #### **`cmn::output::warn`**
 
-Outputs a warning message on `stdout`.
-
+Outputs a warning message on `stdout`.\
 Can be called with a string argument or with a Bash heredoc.
 
-##### :bulb: Examples:
+<details>
+<summary>Examples</summary>
+
 ```bash
 # Calling:
 cmn::output::warn "This is a warning."
@@ -77,18 +81,19 @@ cmn::output::warn <<- EOM
  !      This is a warning message.
  !      That should be useful to understand what's going on.
 ```
+</details>
 
 #### **`cmn::output::err`**
 
-Outputs an error message on both `stdout` and `stderr`.
-
+Outputs an error message on both `stdout` and `stderr`.\
 Can be called with a string argument or with a Bash heredoc.
 
 > [!TIP]
 > When the`DEBUG` environment variable is set (to any value), prints out
   a traceback.
 
-##### :bulb: Examples:
+<details>
+<summary>Examples</summary>
 
 ```bash
 # Calling:
@@ -120,17 +125,18 @@ cmn::output::err "This is another error."
  !!     Traceback:
  !!     bin/compile: main: 89
 ```
+</details>
 
 #### **`cmn::output::debug`**
 
-Outputs a debug message on `stdout`.
-
+Outputs a debug message on `stdout`.\
 Can be called with a string argument or with a Bash heredoc.
 
 > [!WARNING]
 > Only prints out when the `DEBUG` environment variable is set (to any value).
 
-##### :bulb: Examples:
+<details>
+<summary>Examples</summary>
 
 ```bash
 # Calling:
@@ -161,14 +167,16 @@ cmn::output::debug <<- EOM
  *      bin/compile: main: 34: This is a debug message.
  *      bin/compile: main: 34: That should be useful to understand what's going on.
 ```
+</details>
 
+* * *
 
 ### Trap Functions
 
 #### **`cmn::trap::setup`**
 
 Instructs the buildpack to catch the `EXIT`, `SIGHUP`, `SIGINT`, `SIGQUIT`,
-`SIGABRT`, and `SIGTERM` signals and to call [`cmn::bp::fail`](#cmnbpfail)
+`SIGABRT`, and `SIGTERM` signals and to call [`cmn::main::fail`](#cmnmainfail)
 when it happens.
 
 #### **`cmn::trap::teardown`**
@@ -176,10 +184,11 @@ when it happens.
 Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
 
+* * *
 
 ### Flow Functions
 
-#### **`cmn::bp::start`**
+#### **`cmn::main::start`**
 
 Marks the begining of the buildpack.
 
@@ -188,7 +197,7 @@ Calls [`cmn::trap::setup`](#cmntrapsetup).
 > [!TIP]
 > Use this function at the beginning of the buildpack.
 
-#### **`cmn::bp::finish`**
+#### **`cmn::main::finish`**
 
 Outputs a success message and exits with a `0` return code, thus instructing
 the platform that the buildpack ran successfully.
@@ -199,7 +208,7 @@ Calls [`cmn::trap::teardown`](#cmntrapteardown).
 > Use this function as the last instruction of the buildpack, when it
   succeeded.
 
-#### **`cmnlib::bp::fail`**
+#### **`cmnlib::main::fail`**
 
 Outputs an error message and exits with a `1` return code, thus instructing
 the platform that the buildpack failed (and so did the build).
@@ -255,21 +264,9 @@ Calls [`cmn::ouput::err`](#cmnoutputerr) with `$1` when `$1` is set.
 > [!TIP]
 > Use this function when the task failed.
 
-
+* * *
 
 ### File Functions
-
-#### **`cmn::file::sum`**
-
-Computes the checksum of the given file.
-
-##### :bulb: Example:
-
-```bash
-file="file.tar.gz"
-
-checksum="$( cmn::file::sum "${file}" )"
-```
 
 #### **`cmn::file::check_checksum`**
 
@@ -277,9 +274,8 @@ Computes the checksum of a file and checks that it matches the one stored in
 the reference file.\
 `md5`, `sha1` and `sha256` hashing algorithm are currently supported.
 
-Calls [`cmn::file::sum`](#cmnfilesum).
-
-##### :bulb: Example:
+<details>
+<summary>Example</summary>
 
 ```bash
 file="file.tar.gz"
@@ -299,12 +295,14 @@ fi
 
 cmn::task::finish
 ```
+</details>
 
 #### **`cmn::file::download`**
 
 Downloads the file pointed by the given URL and stores it at the given path.
 
-##### :bulb: Example:
+<details>
+<summary>Example</summary>
 
 ```bash
 file="https://example.org/file.tar.gz"
@@ -319,7 +317,9 @@ fi
 
 cmn::task::finish
 ```
+</details>
 
+* * *
 
 ### String Functions
 
@@ -328,7 +328,8 @@ cmn::task::finish
 Outputs a string by joining all the arguments, separated by the given
 separator.
 
-##### :bulb: Examples:
+<details>
+<summary>Examples</summary>
 
 ```bash
 # With:
@@ -346,7 +347,9 @@ cmn::str::join "-" "one" "two" "three" "four"
 # Would output:
 one-two-three-four
 ```
+</details>
 
+* * *
 
 ### Environment Functions
 
@@ -367,3 +370,33 @@ A few environment variables are ignored: `PATH`, `GIT_DIR`, `CPATH`, `CPPATH`,
 
 Calls [`cmn::str::join`](#cmnstrjoin).
 
+* * *
+
+### Buildpack Functions
+
+#### **`cmn::bp::run`**
+
+Git-clone a buildpack and runs it.
+
+<details>
+<summary>Example</summary>
+
+```bash
+# Call the Apt Buildpack inside the running buildpack:
+
+bp_url="https://github.com/Scalingo/apt-buildpack.git"
+bp_output=""
+
+if ! bp_output="$( cmn::bp::run \
+        "https://github.com/Scalingo/apt-buildpack.git" \
+        "${build_dir}" "${cache_dir}" "${env_dir}" )"; then
+    cmn::task::fail
+    cmn::output::err <<- EOM
+        Failed to run apt-buildpack.
+        Output:
+        ${bp_output}
+    EOM
+    exit 2
+fi
+```
+</details>
