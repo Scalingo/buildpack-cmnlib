@@ -43,7 +43,7 @@ cmn::output::err() {
 		printf "%b !!\t%b%b\n" "${RED}" "${line}" "${NC}" >&2
 	done
 
-	if [[ -n ${DEBUG} ]]; then
+	if [[ -n ${BUILDPACK_DEBUG} ]]; then
 		printf " !!\t%s\n" "Traceback:"
 
 		for (( i=1; i<${#FUNCNAME[@]}; i++ )); do
@@ -56,7 +56,7 @@ cmn::output::err() {
 }
 
 cmn::output::debug() {
-	[[ -z "${DEBUG}" ]] && return
+	[[ -z "${BUILDPACK_DEBUG}" ]] && return
 
 	[[ ${#} -gt 0 ]] && exec <<< "${@}"
 
@@ -264,7 +264,9 @@ cmn::bp::run() {
 	env_dir="${1}"; shift
 
 	local bp_dir
-	bp_dir="$( mktemp --directory sub_buildpack_XXXXX )"
+	if ! bp_dir="$( mktemp --quiet --directory sub_buildpack_XXXXX )"; then
+		return "${rc}"
+	fi
 
 	# If the repo is not reachable, fail instead of asking for credentials
 	if ! GIT_TERMINAL_PROMPT=0 \

@@ -117,7 +117,7 @@ cmn::output::err <<- EOM
 
 ```bash
 # Calling:
-export DEBUG=yes
+export BUILDPACK_DEBUG=yes
 cmn::output::err "This is another error."
 
 # Would output:
@@ -133,7 +133,8 @@ Outputs a debug message on `stdout`.\
 Can be called with a string argument or with a Bash heredoc.
 
 > [!WARNING]
-> Only prints out when the `DEBUG` environment variable is set (to any value).
+> Only prints out when the `BUILDPACK_DEBUG` environment variable is set (to\
+  any value).
 
 <details>
 <summary>Examples</summary>
@@ -142,13 +143,13 @@ Can be called with a string argument or with a Bash heredoc.
 # Calling:
 cmn::output::debug "This is a debug message."
 
-# Would be skipped because DEBUG is not set
+# Would be skipped because BUILDPACK_DEBUG is not set
 # Would not output anything.
 ```
 
 ```bash
 # Calling:
-export DEBUG=yes
+export BUILDPACK_DEBUG=yes
 cmn::output::debug "This is a debug message."
 
 # Would output:
@@ -157,7 +158,7 @@ cmn::output::debug "This is a debug message."
 
 ```bash
 # Calling:
-export DEBUG=yes
+export BUILDPACK_DEBUG=yes
 cmn::output::debug <<- EOM
     This is a debug message.
     That should be useful to understand what's going on.
