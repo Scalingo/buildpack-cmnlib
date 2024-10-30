@@ -189,12 +189,18 @@ cmn::file::download() {
 
 
 cmn::str::join() {
-	local IFS
+	local separator
+	local res
 
-	IFS="${1}"
-
+	separator="${1}"
+	readonly separator
 	shift
-	echo "${*}"
+
+	res="$( printf "${separator}%s" ${*} )"
+	# Remove leading separator:
+	res="${res:${#separator}}"
+
+	echo "${res}"
 }
 
 
