@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+
+source "$( pwd )/test/utils"
+source "$( pwd )/test/helpers"
+
+source "$( pwd )/cmnlib.sh"
+
+
+test::output::info() {
+	test::utils::capture cmn::output::info "Hello World!"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches "     Hello World!"
+	test::utils::assertStderrMatches ""
+}
+
+test::output::info_multiline() {
+	local expected
+	expected="     Hello World!
+     On multiple lines."
+
+	test::utils::capture cmn::output::info <<- EOM
+		Hello World!
+		On multiple lines.
+	EOM
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches "${expected}"
+	test::utils::assertStderrMatches ""
+}
+
+test::output::warn() {
+	test::utils::capture cmn::output::warn "Warning!"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches " !   Warning!"
+	test::utils::assertStderrMatches ""
+}
+
+test::output::warn_multiline() {
+	local expected
+	expected=" !   Warning 1!
+ !   Warning 2!"
+	
+	test::utils::capture cmn::output::warn <<- EOM
+		Warning 1!
+		Warning 2!
+	EOM
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches "${expected}"
+	test::utils::assertStderrMatches ""
+}
+
+test::output::err() {
+	test::utils::capture cmn::output::err "Error!"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches " !!  Error!"
+}
+
+test::output::err_multiline() {
+	local expected
+	expected=" !!  Error 1!
+ !!  Error 2!"
+	
+	test::utils::capture cmn::output::err <<- EOM
+		Error 1!
+		Error 2!
+	EOM
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches "${expected}"
+}
+
+test::output::debug() {
+	local expected
+	expected="
+ \*   .*test/utils: test::utils::capture: [0-9]+: Debug"
+
+	# Make sure BUILDPACK_DEBUG is set:
+	export BUILDPACK_DEBUG="yes"
+	test::utils::capture cmn::output::debug "Debug"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches "${expected}"
+	test::utils::assertStderrMatches ""
+}
+
+test::output::debug_multiline() {
+	local expected
+	expected="
+ \*   .*test/utils: test::utils::capture: [0-9]+: Debug 1!
+ \*   .*test/utils: test::utils::capture: [0-9]+: Debug 2!"
+
+	# Make sure BUILDPACK_DEBUG is set:
+	export BUILDPACK_DEBUG="yes"
+	test::utils::capture cmn::output::debug <<- EOM
+		Debug 1!
+		Debug 2!
+	EOM
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches "${expected}"
+	test::utils::assertStderrMatches ""
+}
+
+test::output::debug_not_enabled() {
+	# Make sure BUILDPACK_DEBUG is not set:
+	unset BUILDPACK_DEBUG
+	test::utils::capture cmn::output::debug "Debug is not enabled"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::output::traceback() {
+	local expected
+    expected=" !!  Traceback:
+ !!    .*test\/utils: test::utils::capture: [0-9]+
+ !!    .*test\/tests: test::output::traceback: [0-9]+
+ !!    .*test\/shunit2: _shunit_execSuite: 1057
+ !!    .*test\/shunit2: source: 1331
+ !!    .*test\/run: main: [0-9]+"
+
+	test::utils::capture cmn::output::traceback
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches "${expected}"
+}
+
+
+# Add these functions to the test suite:
+
+suite_addTest test::output::info
+suite_addTest test::output::info_multiline
+suite_addTest test::output::warn
+suite_addTest test::output::warn_multiline
+suite_addTest test::output::err
+suite_addTest test::output::err_multiline
+suite_addTest test::output::debug
+suite_addTest test::output::debug_multiline
+suite_addTest test::output::debug_not_enabled
+suite_addTest test::output::traceback

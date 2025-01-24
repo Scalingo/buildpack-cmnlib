@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+if [[ -n "${DEBUG}" ]]; then
+	set -o pipefail
+	set -o xtrace
+fi
+
+dir="$( pwd )"
+
+suite() {
+#
+# Load tests from the following file
+#
+
+	source "${dir}/test/tests"
+}
+
+oneTimeSetUp() {
+	TEST_SUITE_CACHE="$( mktemp --directory "${SHUNIT_TMPDIR}/test_suite_cache.XXXX" )"
+}
+
+oneTimeTearDown() {
+	rm --recursive --force "${TEST_SUITE_CACHE}"
+}
+
+setUp() {
+	OUTPUT_DIR="$( mktemp --directory "${SHUNIT_TMPDIR}/output.XXXX" )"
+
+	STD_OUT="${OUTPUT_DIR}/stdout"
+	STD_ERR="${OUTPUT_DIR}/stderr"
+
+	CACHE_DIR="${OUTPUT_DIR}/cache"
+
+	mkdir --parents "${CACHE_DIR}"
+	export OUTPUT_DIR STD_OUT STD_ERR CACHE_DIR
+}
+
+tearDown() {
+	# Remove OUTPUT_DIR, which also removes CACHE_DIR:
+	rm --recursive --force "${OUTPUT_DIR}"
+
+	unset CACHE_DIR
+}
+
+# Load shUnit2, which also run the tests:
+source "${dir}/test/shunit2"
