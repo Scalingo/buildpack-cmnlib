@@ -38,7 +38,7 @@ Can be called with a string argument or with a Bash heredoc.
 cmn::output::info "This is an example."
 
 # Would output:
-        This is an example.
+     This is an example.
 ```
 
 ```bash
@@ -49,8 +49,8 @@ cmn::output::info <<- EOM
     EOM
 
 # Would output:
-        This is an informative message.
-        That should be useful to understand what's going on.
+     This is an informative message.
+     That should be useful to understand what's going on.
 ```
 </details>
 
@@ -67,7 +67,7 @@ Can be called with a string argument or with a Bash heredoc.
 cmn::output::warn "This is a warning."
 
 Would output:
- !      This is a warning.
+ !   This is a warning.
 ```
 
 ```bash
@@ -78,19 +78,22 @@ cmn::output::warn <<- EOM
     EOM
 
 # Would output:
- !      This is a warning message.
- !      That should be useful to understand what's going on.
+ !   This is a warning message.
+ !   That should be useful to understand what's going on.
 ```
 </details>
 
 #### **`cmn::output::err`**
 
-Outputs an error message on both `stdout` and `stderr`.\
+Outputs an error message on `stderr`.\
 Can be called with a string argument or with a Bash heredoc.
 
+Calls [`cmn::output::traceback`](#cmnoutputtraceback) when `BUILPACK_DEBUG` is
+set.
+
 > [!TIP]
-> When the`DEBUG` environment variable is set (to any value), prints out
-  a traceback.
+> When the `BUILDPACK_DEBUG` environment variable is set (to any value), prints
+  out a traceback.
 
 <details>
 <summary>Examples</summary>
@@ -100,7 +103,7 @@ Can be called with a string argument or with a Bash heredoc.
 cmn::output::err "This is an error."
 
 # Would output:
- !!     This is an error.
+ !!  This is an error.
 ```
 
 ```bash
@@ -111,8 +114,8 @@ cmn::output::err <<- EOM
     EOM
 
 # Would output:
- !!     This is an error message.
- !!     That should be useful to understand what's going on.
+ !!  This is an error message.
+ !!  That should be useful to understand what's going on.
 ```
 
 ```bash
@@ -121,9 +124,10 @@ export BUILDPACK_DEBUG=yes
 cmn::output::err "This is another error."
 
 # Would output:
- !!     This is another error.
- !!     Traceback:
- !!     bin/compile: main: 89
+ !!  This is another error.
+
+ !!  Traceback:
+ !!    bin/compile: main: 89
 ```
 </details>
 
@@ -153,7 +157,7 @@ export BUILDPACK_DEBUG=yes
 cmn::output::debug "This is a debug message."
 
 # Would output:
- *      bin/compile: main: 34: This is a debug message.
+ *   bin/compile: main: 34: This is a debug message.
 ```
 
 ```bash
@@ -165,8 +169,26 @@ cmn::output::debug <<- EOM
     EOM
 
 # Would output:
- *      bin/compile: main: 34: This is a debug message.
- *      bin/compile: main: 34: That should be useful to understand what's going on.
+ *   bin/compile: main: 34: This is a debug message.
+ *   bin/compile: main: 34: That should be useful to understand what's going on.
+```
+</details>
+
+#### **`cmn::output::traceback`**
+
+Outputs a traceback on `stderr`.\
+
+<details>
+<summary>Examples</summary>
+
+```bash
+# Calling:
+cmn::output::traceback
+
+# Would output (to `stderr`):
+ !!  Traceback:
+ !!    bin/compile: some_func: 12
+ !!    bin/compile: main: 89
 ```
 </details>
 
