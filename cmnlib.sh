@@ -43,10 +43,6 @@ cmn::output::err() {
 # Outputs an error message on stderr.
 # Can be called with a string argument or with a Bash heredoc.
 #
-# Globals:
-# - RED
-# - NC
-#
 
 	# Calling `exec` without a /command/ argument (which is the case here)
 	# applies any redirection applied to it to the current shell.

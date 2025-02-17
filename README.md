@@ -38,7 +38,7 @@ Can be called with a string argument or with a Bash heredoc.
 cmn::output::info "This is an example."
 
 # Would output:
-     This is an example.
+    This is an example.
 ```
 
 ```bash
@@ -176,7 +176,7 @@ cmn::output::debug <<- EOM
 
 #### **`cmn::output::traceback`**
 
-Outputs a traceback on `stderr`.\
+Outputs a traceback on `stderr`.
 
 <details>
 <summary>Examples</summary>
@@ -289,6 +289,75 @@ Calls [`cmn::ouput::err`](#cmnoutputerr) with `$1` when `$1` is set.
 
 * * *
 
+### Cache Functions
+
+#### **`cmn::cache::get`**
+
+Checks whether the given file exists in `CACHE_DIR`.
+
+Calls [`cmn::output_debug`](#cmnoutputdebug).
+
+<details>
+<summary>Example</summary>
+```bash
+file="file.tar.gz"
+
+if cmn::cache::get "${file}"; then
+    cmn::output::info "${file}" found in cache."
+else
+    cmn::output::info "${file}" not found in cache."
+    cmn::task::start "Downloading ${file}"
+    [...]
+fi
+```
+</details>
+
+#### **`cmn::cache::put`**
+
+Copies the given file in `CACHE_DIR`.\
+Destination is relative to `CACHE_DIR`.
+
+If destination involves a path, makes sure the directories exist before trying
+to copy the file(s).
+
+If destination is not set, the file is copied to `CACHE_DIR` with the same
+name.
+
+Calls [`cmn::output::debug`](cmnoutputdebug).
+
+<details>
+<summary>Examples</summary>
+```bash
+# Calling:
+cmn::cache::put "archive.tar.gz" "archive-version.tar.gz"
+
+# Would copy `archive.tar.gz` in `$CACHE_DIR/archive-version.tar.gz`
+```
+
+```bash
+# Calling:
+cmn::cache::put "archive.tar.gz" "lib/version/archive.tar.gz"
+
+# Would copy `archive.tar.gz` in `$CACHE_DIR/lib/version/archive.tar.gz`
+```
+
+```bash
+# Calling:
+cmn::cache::put "downloads/archive.tar.gz"
+
+# Would copy `archive.tar.gz` in `$CACHE_DIR/archive.tar.gz`
+```
+
+```bash
+# Calling:
+cmn::cache::put "my_directory"
+
+# Would copy `my_directory` (and its content) in `$CACHE_DIR/my_directory`
+```
+</details>
+
+* * *
+
 ### File Functions
 
 #### **`cmn::file::check_checksum`**
@@ -299,7 +368,6 @@ the reference file.\
 
 <details>
 <summary>Example</summary>
-
 ```bash
 file="file.tar.gz"
 reference="file.tar.gz.md5"
@@ -339,6 +407,68 @@ if ! cmn::file::download "${file}" "${output}"; then
 fi
 
 cmn::task::finish
+```
+</details>
+
+#### **`cmn::file::download_and_check`**
+
+Downloads a file from the specified URL and stores it at the specified path.\
+Also downloads the checksum from the specified URL and stores it at the
+specified path.\
+Finally checks the hash of the downloaded file against the downloaded checksum.
+
+Calls [`cmn::file::download`](#cmnfiledownload)
+Calls [`cmn::file::check_checksum`](#cmnfilecheck_checksum)
+Calls [`cmn::jobs::wait`](#cmnjobswait)
+
+<details>
+<summary>Example</summary>
+```bash
+archive_version="1.2.3"
+
+cmn::task::start "Downloading archive ${archive_version}"
+
+file_url="https://example.com/archive.tar.gz"
+hash_url="https://example.com/archive.tar.gz.sha256"
+file_path="${tmpdir}/archive.tar.gz"
+hash_path="${tmpdir}/archive.tar.gz.sha256"
+
+if cmn::file::download_and_check "${file_url}" "${hash_url}" \
+                                 "${file_path}" "${hash_path}"
+then
+    cmn::task::fail
+    cmn::output::err <<- EOM
+        Could not safely download archive ${archive_version}!
+    EOM
+
+    exit 2
+fi
+
+cmn::cache::put "${file_path}" "${CACHE_DIR}/archive-${archive_version}.tar.gz"
+```
+</details>
+
+* * *
+
+### Jobs Functions
+
+#### **`cmn::jobs::wait`**
+
+Waits for all child jobs running in background to finish.\
+Returns the number of failed jobs (zero means they all succeeded).
+
+<details>
+<summary>Example</Summary>
+```bash
+# Start two downloads in background:
+cmn::file::download "${file_url}" "${file_path}" &
+cmn::file::download "${hash_url}" "${hash_path}" &
+
+# Wait for them to be finished and successful before comparing checksums:
+if cmn::jobs::wait; then
+    cmn::file::check_checksum "${file_path}" "${hash_path}"
+    [...]
+fi
 ```
 </details>
 
