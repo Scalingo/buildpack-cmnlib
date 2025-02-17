@@ -547,8 +547,7 @@ Git-clone a buildpack and runs it.
 bp_url="https://github.com/Scalingo/apt-buildpack.git"
 bp_output=""
 
-if ! bp_output="$( cmn::bp::run \
-        "https://github.com/Scalingo/apt-buildpack.git" \
+if ! bp_output="$( cmn::bp::run "${bp_url}" \
         "${build_dir}" "${cache_dir}" "${env_dir}" )"; then
     cmn::task::fail
     cmn::output::err <<- EOM
