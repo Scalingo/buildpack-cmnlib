@@ -299,6 +299,7 @@ Calls [`cmn::output_debug`](#cmnoutputdebug).
 
 <details>
 <summary>Example</summary>
+
 ```bash
 file="file.tar.gz"
 
@@ -323,10 +324,11 @@ to copy the file(s).
 If destination is not set, the file is copied to `CACHE_DIR` with the same
 name.
 
-Calls [`cmn::output::debug`](cmnoutputdebug).
+Calls [`cmn::output::debug`](#cmnoutputdebug).
 
 <details>
 <summary>Examples</summary>
+
 ```bash
 # Calling:
 cmn::cache::put "archive.tar.gz" "archive-version.tar.gz"
@@ -368,6 +370,7 @@ the reference file.\
 
 <details>
 <summary>Example</summary>
+
 ```bash
 file="file.tar.gz"
 reference="file.tar.gz.md5"
@@ -417,12 +420,13 @@ Also downloads the checksum from the specified URL and stores it at the
 specified path.\
 Finally checks the hash of the downloaded file against the downloaded checksum.
 
-Calls [`cmn::file::download`](#cmnfiledownload)
-Calls [`cmn::file::check_checksum`](#cmnfilecheck_checksum)
+Calls [`cmn::file::download`](#cmnfiledownload)\
+Calls [`cmn::file::check_checksum`](#cmnfilecheck_checksum)\
 Calls [`cmn::jobs::wait`](#cmnjobswait)
 
 <details>
 <summary>Example</summary>
+
 ```bash
 archive_version="1.2.3"
 
@@ -459,6 +463,7 @@ Returns the number of failed jobs (zero means they all succeeded).
 
 <details>
 <summary>Example</Summary>
+
 ```bash
 # Start two downloads in background:
 cmn::file::download "${file_url}" "${file_path}" &
