@@ -11,13 +11,19 @@ prevent code rewriting thanks to commonly used utilities.
 The library is available at `https://<s3_url>/<bucket>/<version>/cmnlib.sh`,
 with `<version>` being either `latest` or a specific release.
 
-Place the following instruction towards the top of the `bin/compile` file of
-the buildpack to download and import the library:
+Place the following instruction at the very beginning of the `bin/compile` file
+of the buildpack to download and import the library:
 
 ```bash
-declare -F cmn::output::info >/dev/null \
-    || source /dev/stdin <<< "$( curl --silent --location --retry 3 "https://<s3_url>/<bucket>/<version>/cmnlib.sh" )" \
-        || { printf "Unable to load cmnlib, aborting." >&2; exit 1; }
+#!/usr/bin/env bash
+
+cmnlib_url="https://s3url/bucket/version/cmnlib.sh"
+
+if ! declare -F cmn::output::info >/dev/null; then
+    source /dev/stdin <<< \
+        "$( curl --silent --location --retry 3 "${cmnlib_url}" \
+        || printf "echo ' 🗙 Unable to load cmnlib, aborting.' >&2 && exit 1"; )"
+fi
 ```
 
 
@@ -213,12 +219,32 @@ Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 
 #### **`cmn::main::start`**
 
-Marks the begining of the buildpack.
+Marks the begining of the buildpack.\
+Sets `errexit` and `pipefail`.\
+Populates the following variables:
+- `$build_dir`: path to the build directory
+- `$cache_dir`: path to the cache directory
+- `$env_dir`: path to the environment directory
+- `$base_dir`: path to the current working directory
+- `$buildpack_dir`: path to the buildpack directory
+- `$tmp_dir`: path to a temporary directory
 
 Calls [`cmn::trap::setup`](#cmntrapsetup).
 
 > [!TIP]
 > Use this function at the beginning of the buildpack.
+
+<details>
+<summary>Example</summary>
+
+```bash
+cmn::main::start "${0}" "${1}" "${2}" "${3}"
+
+# After calling this, $build_dir, $cache_dir, $env_dir, $buildpack_dir and
+# $tmp_dir are populated and usable.
+# Calling `exit` is also trapped from now on.
+```
+</details>
 
 #### **`cmn::main::finish`**
 
@@ -286,77 +312,6 @@ Calls [`cmn::ouput::err`](#cmnoutputerr) with `$1` when `$1` is set.
 
 > [!TIP]
 > Use this function when the task failed.
-
-* * *
-
-### Cache Functions
-
-#### **`cmn::cache::get`**
-
-Checks whether the given file exists in `CACHE_DIR`.
-
-Calls [`cmn::output_debug`](#cmnoutputdebug).
-
-<details>
-<summary>Example</summary>
-
-```bash
-file="file.tar.gz"
-
-if cmn::cache::get "${file}"; then
-    cmn::output::info "${file}" found in cache."
-else
-    cmn::output::info "${file}" not found in cache."
-    cmn::task::start "Downloading ${file}"
-    [...]
-fi
-```
-</details>
-
-#### **`cmn::cache::put`**
-
-Copies the given file in `CACHE_DIR`.\
-Destination is relative to `CACHE_DIR`.
-
-If destination involves a path, makes sure the directories exist before trying
-to copy the file(s).
-
-If destination is not set, the file is copied to `CACHE_DIR` with the same
-name.
-
-Calls [`cmn::output::debug`](#cmnoutputdebug).
-
-<details>
-<summary>Examples</summary>
-
-```bash
-# Calling:
-cmn::cache::put "archive.tar.gz" "archive-version.tar.gz"
-
-# Would copy `archive.tar.gz` in `$CACHE_DIR/archive-version.tar.gz`
-```
-
-```bash
-# Calling:
-cmn::cache::put "archive.tar.gz" "lib/version/archive.tar.gz"
-
-# Would copy `archive.tar.gz` in `$CACHE_DIR/lib/version/archive.tar.gz`
-```
-
-```bash
-# Calling:
-cmn::cache::put "downloads/archive.tar.gz"
-
-# Would copy `archive.tar.gz` in `$CACHE_DIR/archive.tar.gz`
-```
-
-```bash
-# Calling:
-cmn::cache::put "my_directory"
-
-# Would copy `my_directory` (and its content) in `$CACHE_DIR/my_directory`
-```
-</details>
 
 * * *
 

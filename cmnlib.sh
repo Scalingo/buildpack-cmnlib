@@ -130,10 +130,18 @@ cmn::trap::teardown() {
 
 cmn::main::start() {
 #
-# Marks the begining of the buildpack.
+# Configures Bash options and marks the beginning of the buildpack.
+#
 # Calls `cmn::trap::setup`.
 # Use this function at the beginning of the buildpack.
 #
+
+	set -o errexit
+	set -o pipefail
+
+	if [ -n "${BUILDPACK_DEBUG}" ]; then
+		set -o xtrace
+	fi
 
 	cmn::trap::setup
 }
@@ -231,77 +239,6 @@ cmn::task::fail() {
 
 
 
-cmn::cache::get() {
-#
-# Checks whether the given file exists in `CACHE_DIR`.
-# If so, returns 0, else 1.
-#
-
-	local rc
-	#local filepath
-
-	rc=1
-
-	printf -v filepath "%s/%s" "${CACHE_DIR}" "${1}"
-
-	cmn::output::debug "Checking whether '${filepath}' exists or not."
-
-	[[ -f "${filepath}" ]]
-}
-
-cmn::cache::put() {
-#
-# Copies the given file in `CACHE_DIR`.
-# Destination is relative to `CACHE_DIR`.
-#
-# If destination involves a path, makes sure the directories exist before
-# trying to copy the file(s).
-#
-# If destination is not set, the file is copied to `CACHE_DIR` with the same
-# name.
-#
-# Examples:
-#
-# cmn::cache::put "archive.tar.gz" "archive-version.tar.gz"
-# copies `archive.tar.gz` to `${CACHE_DIR}/archive-version.tar.gz`
-#
-# cmn::cache::put "archive.tar.gz" "lib/version/archive.tar.gz"
-# copies `archive.tar.gz` to `${CACHE_DIR}/lib/version/archive.tar.gz`
-#
-# cmn::cache::put "downloads/archive.tar.gz`
-# copies `archive.tar.gz` to `${CACHE_DIR}/archive.tar.gz`
-#
-# cmn::cache::put "my_directory"
-# copies `my_directory` (and its content) to `${CACHE_DIR}/my_directory`
-#
-
-	local rc
-
-	local src
-	local dst
-	local cp_output
-
-	rc=1
-	src="${1}"
-	# Defaults to basename($1) when $2 is not set:
-	dst="${CACHE_DIR}/${2:-"${src##*/}"}"
-
-	# Make sure target path exists:
-	mkdir --parents "$( dirname "${dst}" )"
-
-	cp_output="$( cp --force --recursive --verbose "${src}" "${dst}" 2>&1 )"
-	rc="${?}"
-
-	cmn::output::debug <<- EOM
-		Copying '${src}' to '${dst}':
-		${cp_output}
-	EOM
-
-	return "${rc}"
-}
-
-
-
 cmn::file::check_checksum() {
 #
 # Computes the checksum of a file and checks that it matches the one stored in
@@ -365,13 +302,7 @@ cmn::file::download() {
 	url="${1}"; shift
 	out="${1:-"-"}"; shift
 
-	if [[ -n "${BUILDPACK_DEBUG}" ]]; then
-		curl --silent --fail --retry 3 \
-			--location "${url}" --output "${out}"
-	else
-		curl --silent --fail --retry 3 \
-			--location "${url}" --output "${out}"
-	fi
+	curl --silent --fail --retry 3 --location "${url}" --output "${out}"
 
 	return "${?}"
 }
@@ -520,7 +451,8 @@ cmn::bp::run() {
 	env_dir="${1}"; shift
 
 	local bp_dir
-	if ! bp_dir="$( mktemp --quiet --directory sub_buildpack_XXXXX )"; then
+	if ! bp_dir="$( mktemp --directory --tmpdir="/tmp" \
+						--quiet "sub_bp-XXXXXX" )"; then
 		return "${rc}"
 	fi
 
@@ -538,6 +470,7 @@ cmn::bp::run() {
 		else
 			# Source `export` file if it exists:
 			if [[ -f "${bp_dir}/export" ]]; then
+				# shellcheck disable=SC1091
 				source "${bp_dir}/export"
 			fi
 
@@ -572,9 +505,6 @@ readonly -f cmn::step::fail
 readonly -f cmn::task::start
 readonly -f cmn::task::finish
 readonly -f cmn::task::fail
-
-readonly -f cmn::cache::get
-readonly -f cmn::cache::put
 
 readonly -f cmn::file::check_checksum
 readonly -f cmn::file::download
