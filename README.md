@@ -220,31 +220,12 @@ Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 #### **`cmn::main::start`**
 
 Marks the begining of the buildpack.\
-Sets `errexit` and `pipefail`.\
-Populates the following variables:
-- `$build_dir`: path to the build directory
-- `$cache_dir`: path to the cache directory
-- `$env_dir`: path to the environment directory
-- `$base_dir`: path to the current working directory
-- `$buildpack_dir`: path to the buildpack directory
-- `$tmp_dir`: path to a temporary directory
+Sets `errexit` and `pipefail`.
 
 Calls [`cmn::trap::setup`](#cmntrapsetup).
 
 > [!TIP]
 > Use this function at the beginning of the buildpack.
-
-<details>
-<summary>Example</summary>
-
-```bash
-cmn::main::start "${0}" "${1}" "${2}" "${3}"
-
-# After calling this, $build_dir, $cache_dir, $env_dir, $buildpack_dir and
-# $tmp_dir are populated and usable.
-# Calling `exit` is also trapped from now on.
-```
-</details>
 
 #### **`cmn::main::finish`**
 
