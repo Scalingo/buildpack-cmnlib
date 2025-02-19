@@ -376,6 +376,11 @@ cmn::jobs::wait() {
 
 
 cmn::str::join() {
+#
+# Outputs a string by joining all the arguments, separated by the given
+# separator.
+#
+
 	local separator
 	local res
 
@@ -393,6 +398,12 @@ cmn::str::join() {
 
 
 cmn::env::read() {
+#
+# Reads and exports environment variables stored as files in $ENV_DIR.
+# Use towards the beginning of the buildpack, especially if it can be called
+# after another buildpack (with a multi-buildpack).
+#
+
 	local env_dir
 	local env_vars
 
@@ -408,6 +419,13 @@ cmn::env::read() {
 }
 
 cmn::env::list() {
+#
+# Lists available environement variables stored as files in $ENV_DIR.
+# A few environment variables are ignored: PATH, GIT_DIR, CPATH, CPPATH,
+# LD_PRELOAD, LIBRARY_PATH, LD_LIBRARY_PATH, JAVA_OPTS, JAVA_TOOL_OPTIONS,
+# BUILDPACK_URL and BUILD_DIR.
+#
+
 	local env_dir
 	local env_vars
 	local blocklist
@@ -438,6 +456,10 @@ cmn::env::list() {
 
 
 cmn::bp::run() {
+#
+# Git-clone a buildpack and runs it.
+#
+
 	local rc
 	local buildpack_url
 	local build_dir
