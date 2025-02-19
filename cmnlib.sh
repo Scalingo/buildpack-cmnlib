@@ -56,7 +56,7 @@ cmn::output::err() {
 		printf " !!  %b\n" "${line}" >&2
 	done
 
-	if [[ -n "${BUILDPACK_DEBUG}" ]]; then
+	if [[ -n "${DEBUG}" ]]; then
 		cmn::output::traceback
 	fi
 }
@@ -65,11 +65,11 @@ cmn::output::debug() {
 #
 # Outputs a debug message on stdout.
 # Can be called with a string argument or with a Bash heredoc.
-# Only outputs when BUILPACK_DEBUG is set!
+# Only outputs when DEBUG is set!
 #
 
-	# Return ASAP if BUILDPACK_DEBUG isn't set
-	[[ -z "${BUILDPACK_DEBUG}" ]] && return
+	# Return ASAP if DEBUG isn't set
+	[[ -z "${DEBUG}" ]] && return
 
 	# Calling `exec` without a /command/ argument (which is the case here)
 	# applies any redirection applied to it to the current shell.
@@ -245,8 +245,8 @@ cmn::file::check_checksum() {
 # the reference file.
 # md5, sha1 and sha256 hashing algorithm are currently supported.
 #
-# $1: file
-# $2: checksum file
+# $1: path to the file
+# $2: path to the checksum file
 #
 
 	local rc
