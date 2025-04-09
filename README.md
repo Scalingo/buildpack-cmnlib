@@ -217,8 +217,16 @@ Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 
 #### **`cmn::main::start`**
 
-Marks the begining of the buildpack.\
+Configures Bash options, populates and exports some variables and marks the
+begining of the buildpack.\
 Sets `errexit` and `pipefail`.
+Populates the following environment variables:
+- `build_dir`: Build directory
+- `cache_dir`: Cache directory
+- `env_dir`: Environment directory
+- `base_dir`: Where the currently running `bin/compile` script resides
+- `buildpack_dir`: Directory containing the buildpack code
+- `tmp_dir`: A temporary directory
 
 Calls [`cmn::trap::setup`](#cmntrapsetup).
 
