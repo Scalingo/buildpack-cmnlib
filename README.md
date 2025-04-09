@@ -221,12 +221,11 @@ Configures Bash options, populates and exports some variables and marks the
 begining of the buildpack.\
 Sets `errexit` and `pipefail`.
 Populates the following environment variables:
-- `build_dir`: Build directory
-- `cache_dir`: Cache directory
-- `env_dir`: Environment directory
-- `base_dir`: Where the currently running `bin/compile` script resides
-- `buildpack_dir`: Directory containing the buildpack code
-- `tmp_dir`: A temporary directory
+- `build_dir`: Absolute path to the build directory
+- `cache_dir`: Absolute path to the cache directory
+- `env_dir`: Absolute path to the environment directory
+- `buildpack_dir`: Absolute path to the directory containing the buildpack code
+- `tmp_dir`: Absolute path to a usable temporary directory
 
 Calls [`cmn::trap::setup`](#cmntrapsetup).
 

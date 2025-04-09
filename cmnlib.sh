@@ -154,7 +154,6 @@ cmn::main::start() {
 	export build_dir
 	export cache_dir
 	export env_dir
-	export base_dir
 	export buildpack_dir
 	export tmp_dir
 
@@ -178,7 +177,6 @@ cmn::main::end() {
 	unset build_dir
 	unset cache_dir
 	unset env_dir
-	unset base_dir
 	unset buildpack_dir
 	unset tmp_dir
 }
