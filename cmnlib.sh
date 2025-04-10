@@ -56,7 +56,7 @@ cmn::output::err() {
 		printf " !!  %b\n" "${line}" >&2
 	done
 
-	if [[ -n "${BUILDPACK_DEBUG}" ]]; then
+	if [[ -n "${DEBUG}" ]]; then
 		cmn::output::traceback
 	fi
 }
@@ -65,11 +65,11 @@ cmn::output::debug() {
 #
 # Outputs a debug message on stdout.
 # Can be called with a string argument or with a Bash heredoc.
-# Only outputs when BUILPACK_DEBUG is set!
+# Only outputs when DEBUG is set!
 #
 
-	# Return ASAP if BUILDPACK_DEBUG isn't set
-	[[ -z "${BUILDPACK_DEBUG}" ]] && return
+	# Return ASAP if DEBUG isn't set
+	[[ -z "${DEBUG}" ]] && return
 
 	# Calling `exec` without a /command/ argument (which is the case here)
 	# applies any redirection applied to it to the current shell.
@@ -82,7 +82,7 @@ cmn::output::debug() {
 	# Read `stdin` line by line and outputs each line formatted.
 	# We also add some traceback information (filename, function and lineno)
 	while read -r line; do
-		printf " *   %s: %s: %s: %s\n" \
+		printf " *   %s: %s: %s: %b\n" \
 			"${BASH_SOURCE[1]}" \
 			"${FUNCNAME[1]}" \
 			"${BASH_LINENO[0]}" \
@@ -130,7 +130,7 @@ cmn::trap::teardown() {
 
 cmn::main::start() {
 #
-# Configures Bash options, populates and exports some variables and marks the
+# Configures Bash options, populates a few global variables and marks the
 # beginning of the buildpack.
 #
 # Calls `cmn::trap::setup`.
@@ -147,15 +147,18 @@ cmn::main::start() {
 	build_dir="${2:-}"
 	cache_dir="${3:-}"
 	env_dir="${4:-}"
+
 	base_dir="$( cd -P "$( dirname "${1}" )" && pwd )"
 	buildpack_dir="$( readlink -f "${base_dir}/.." )"
 	tmp_dir="$( mktemp --directory --tmpdir="/tmp" --quiet "bp-XXXXXX" )"
 
-	export build_dir
-	export cache_dir
-	export env_dir
-	export buildpack_dir
-	export tmp_dir
+	cmn::output::debug <<-EOM
+		build_dir:     ${build_dir}
+		cache_dir:     ${cache_dir}
+		env_dir:       ${env_dir}
+		buildpack_dir: ${buildpack_dir}
+		tmp_dir:       ${tmp_dir}
+	EOM
 
 	pushd "${build_dir}" > /dev/null
 
@@ -177,6 +180,7 @@ cmn::main::end() {
 	unset build_dir
 	unset cache_dir
 	unset env_dir
+	unset base_dir
 	unset buildpack_dir
 	unset tmp_dir
 }
@@ -237,7 +241,7 @@ cmn::step::fail() {
 # Use this function when the step failed.
 #
 
-	printf " %b\n" "Failed."
+	printf "     %b\n" "Failed."
 }
 
 
@@ -269,7 +273,9 @@ cmn::task::fail() {
 
 	echo "Failed."
 
-	[[ -n "${1}" ]] && cmn::output::err "${1}"
+	if [[ -n "${1}" ]]; then
+		cmn::output::err "${1}"
+	fi
 }
 
 
@@ -284,8 +290,8 @@ cmn::file::check_checksum() {
 # $2: checksum file
 #
 
-	local -r file="${1}"; shift
-	local -r hash_file="${1}"; shift
+	local -r file="${1}"
+	local -r hash_file="${2}"
 
 	local -r hash_algo="${hash_file##*.}"
 	local -r ref_hash="$( cut -d " " -f 1 < "${hash_file}" )"
@@ -324,11 +330,8 @@ cmn::file::download() {
 # $2: (opt) Path where to output the downloaded file. Defaults to /dev/stdout.
 #
 
-	local url
-	local out
-
-	local -r url="${1}"; shift
-	local -r out="${1:-"-"}"; shift
+	local -r url="${1}"
+	local -r out="${2:-"-"}"
 
 	curl --silent --fail --retry 3 --location "${url}" --output "${out}"
 
@@ -353,10 +356,10 @@ cmn::file::download_and_check() {
 # $4: hash path (where to store the downloaded checksum file)
 #
 
-	local -r file_url="${1}"; shift
-	local -r hash_url="${1}"; shift
-	local -r file_path="${1}"; shift
-	local -r hash_path="${1}"; shift
+	local -r file_url="${1}"
+	local -r hash_url="${2}"
+	local -r file_path="${3}"
+	local -r hash_path="${4}"
 
 	local rc=1
 
@@ -397,7 +400,7 @@ cmn::jobs::wait() {
 
 
 cmn::str::join() {
-	local -r separator="${1}"; shift
+	local -r separator="${1}"
 
 	local res
 
@@ -411,7 +414,7 @@ cmn::str::join() {
 
 
 cmn::env::read() {
-	local -r env_dir="${1}"; shift
+	local -r env_dir="${1}"
 	local -r env_vars="$( cmn::env::list "${env_dir}" )"
 
 	while read -r e; do
@@ -423,7 +426,7 @@ cmn::env::read() {
 }
 
 cmn::env::list() {
-	local -r env_dir="${1}"; shift
+	local -r env_dir="${1}"
 
 	local env_vars
 	local blocklist
@@ -451,10 +454,10 @@ cmn::env::list() {
 
 
 cmn::bp::run() {
-	local -r buildpack_url="${1}"; shift
-	local -r build_dir="${1}"; shift
-	local -r cache_dir="${1}"; shift
-	local -r env_dir="${1}"; shift
+	local -r buildpack_url="${1}"
+	local -r build_dir="${2}"
+	local -r cache_dir="${3}"
+	local -r env_dir="${4}"
 
 	local rc=1
 	local bp_dir
@@ -503,6 +506,7 @@ readonly -f cmn::trap::setup
 readonly -f cmn::trap::teardown
 
 readonly -f cmn::main::start
+readonly -f cmn::main::end
 readonly -f cmn::main::finish
 readonly -f cmn::main::fail
 

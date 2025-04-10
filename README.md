@@ -217,7 +217,7 @@ Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 
 #### **`cmn::main::start`**
 
-Configures Bash options, populates and exports some variables and marks the
+Configures Bash options, populates a few global variables and marks the
 begining of the buildpack.\
 Sets `errexit` and `pipefail`.
 Populates the following environment variables:
