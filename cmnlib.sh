@@ -15,7 +15,7 @@ cmn::output::info() {
 
 	# Read `stdin` line by line and outputs each line formatted:
 	while read -r line; do
-		printf "     %b\n" "${line}"
+		printf "       %b\n" "${line}"
 	done
 }
 
@@ -34,7 +34,7 @@ cmn::output::warn() {
 
 	# Read `stdin` line by line and outputs each line formatted:
 	while read -r line; do
-		printf " !   %b\n" "${line}"
+		printf " !     %b\n" "${line}"
 	done
 }
 
@@ -53,7 +53,7 @@ cmn::output::err() {
 
 	# Read `stdin` line by line and outputs each line formatted:
 	while read -r line; do
-		printf " !!  %b\n" "${line}" >&2
+		printf " !!    %b\n" "${line}" >&2
 	done
 
 	if [[ -n "${DEBUG}" ]]; then
@@ -82,7 +82,7 @@ cmn::output::debug() {
 	# Read `stdin` line by line and outputs each line formatted.
 	# We also add some traceback information (filename, function and lineno)
 	while read -r line; do
-		printf " *   %s: %s: %s: %b\n" \
+		printf " *     %s: %s: %s: %b\n" \
 			"${BASH_SOURCE[1]}" \
 			"${FUNCNAME[1]}" \
 			"${BASH_LINENO[0]}" \
@@ -95,10 +95,10 @@ cmn::output::traceback() {
 # Outputs a traceback to stderr.
 #
 
-	printf " !!  Traceback:\n" >&2
+	printf " !!    Traceback:\n" >&2
 
 	for (( i=1; i<${#FUNCNAME[@]}; i++ )); do
-		>&2 printf " !!    %s: %s: %s\n" \
+		>&2 printf " !!      %s: %s: %s\n" \
 			"${BASH_SOURCE[i]}" \
 			"${FUNCNAME[$i]}" \
 			"${BASH_LINENO[$i-1]}"
@@ -223,7 +223,7 @@ cmn::step::start() {
 # Use this function when the step is about to start.
 #
 
-	printf "%s %b\n" "--->" "${*}"
+	printf "%s %b\n" "----->" "${*}"
 }
 
 cmn::step::finish() {
@@ -232,7 +232,7 @@ cmn::step::finish() {
 # Use this function when the step succeeded.
 #
 
-	printf "     %b\n" "Done."
+	printf "       %b\n" "Done."
 }
 
 cmn::step::fail() {
@@ -241,7 +241,7 @@ cmn::step::fail() {
 # Use this function when the step failed.
 #
 
-	printf "     %b\n" "Failed."
+	printf "       %b\n" "Failed."
 }
 
 
@@ -253,7 +253,7 @@ cmn::task::start() {
 # Use this function when the task is about to start.
 #
 
-	echo -n "     $*... "
+	echo -n "       $*... "
 }
 
 cmn::task::finish() {
