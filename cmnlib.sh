@@ -300,17 +300,22 @@ cmn::file::check_checksum() {
 
 	case "${hash_algo}" in
 		"sha1")
-			shasum --algorithm 1 --check --status <<< "${ref_hash}  ${file}"
+			shasum --algorithm 1 --check --status <<< "${ref_hash} ${file}"
 			rc="${?}"
 			;;
 
 		"sha256")
-			shasum --algorithm 256 --check --status <<< "${ref_hash}  ${file}"
+			shasum --algorithm 256 --check --status <<< "${ref_hash} ${file}"
+			rc="${?}"
+			;;
+
+		"sha512")
+			shasum --algorithm 512 --check --status <<< "${ref_hash} ${file}"
 			rc="${?}"
 			;;
 
 		"md5")
-		    md5sum --check --status <<< "${ref_hash}  ${file}"
+		    md5sum --check --status <<< "${ref_hash} ${file}"
 			rc="${?}"
 			;;
 
@@ -414,6 +419,16 @@ cmn::str::join() {
 
 
 cmn::env::read() {
+#
+# Exports configuration variables of a buildpacks ENV_DIR to environment
+# variables.
+#
+# Only configuration variables which names pass the positive pattern and don't
+# match the negative pattern are exported.
+#
+# Calls `cmn::env::list`
+#
+
 	local -r env_dir="${1}"
 	local -r env_vars="$( cmn::env::list "${env_dir}" )"
 
