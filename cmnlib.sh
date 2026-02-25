@@ -6,17 +6,20 @@ cmn::output::info() {
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	# Calling `exec` without a /command/ argument (which is the case here)
-	# applies any redirection applied to it to the current shell.
-	# Consequently, calling `exec <<< "${@}" feeds stdin with $@.
-	# This allows the function to be called with an argument or with an
-	# heredoc.
-	[[ ${#} -gt 0 ]] && exec <<< "${@}"
-
-	# Read `stdin` line by line and outputs each line formatted:
-	while read -r line; do
-		printf "       %b\n" "${line}"
-	done
+	while IFS= read -r line; do
+		# Apply formatting:
+		printf "    %b\n" "${line}"
+	done < <(
+		if [[ ${#} -gt 0 ]]; then
+			# When we have multiple arguments,
+			# send them one by one to the `while` loop.
+			printf "%b\n" "${@}"
+		else
+			# Calling `cat` without arguments redirects stdin to stdout
+			# This allows to support heredoc.
+			cat
+		fi
+	)
 }
 
 cmn::output::warn() {
@@ -25,17 +28,15 @@ cmn::output::warn() {
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	# Calling `exec` without a /command/ argument (which is the case here)
-	# applies any redirection applied to it to the current shell.
-	# Consequently, calling `exec <<< "${@}" feeds stdin with $@.
-	# This allows the function to be called with an argument or with an
-	# heredoc.
-	[[ ${#} -gt 0 ]] && exec <<< "${@}"
-
-	# Read `stdin` line by line and outputs each line formatted:
-	while read -r line; do
-		printf " !     %b\n" "${line}"
-	done
+	while IFS= read -r line; do
+		printf " !  %b\n" "${line}"
+	done < <(
+		if [[ ${#} -gt 0 ]]; then
+			printf "%b\n" "${@}"
+		else
+			cat
+		fi
+	)
 }
 
 cmn::output::err() {
@@ -44,50 +45,48 @@ cmn::output::err() {
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	# Calling `exec` without a /command/ argument (which is the case here)
-	# applies any redirection applied to it to the current shell.
-	# Consequently, calling `exec <<< "${@}" feeds stdin with $@.
-	# This allows the function to be called with an argument or with an
-	# heredoc.
-	[[ ${#} -gt 0 ]] && exec <<< "${@}"
+	while IFS= read -r line; do
+		printf " !! %b\n" "${line}" >&2
+	done < <(
+		if [[ ${#} -gt 0 ]]; then
+			printf "%b\n" "${@}"
+		else
+			cat
+		fi
+	)
 
-	# Read `stdin` line by line and outputs each line formatted:
-	while read -r line; do
-		printf " !!    %b\n" "${line}" >&2
-	done
-
-	if [[ -n "${DEBUG}" ]]; then
+	if [[ -n "${_CMN_DEBUG_}" ]]; then
 		cmn::output::traceback
 	fi
 }
 
+# shellcheck disable=2120
 cmn::output::debug() {
 #
 # Outputs a debug message on stdout.
 # Can be called with a string argument or with a Bash heredoc.
-# Only outputs when DEBUG is set!
+# Only outputs when _CMN_DEBUG_ is set!
+#
+# Setting _CMN_DEBUG_ should be reserved for cmnlib itself,
+# or when debugging buildpacks.
 #
 
-	# Return ASAP if DEBUG isn't set
-	[[ -z "${DEBUG}" ]] && return
+	# Return ASAP if _CMN_DEBUG_ isn't set
+	[[ -z "${_CMN_DEBUG_}" ]] && return
 
-	# Calling `exec` without a /command/ argument (which is the case here)
-	# applies any redirection applied to it to the current shell.
-	# Consequently, calling `exec <<< "${@}" feeds stdin with $@.
-	# This allows the function to be called with an argument or with an
-	# heredoc.
-	[[ ${#} -gt 0 ]] && exec <<< "${@}"
-
-	echo
-	# Read `stdin` line by line and outputs each line formatted.
-	# We also add some traceback information (filename, function and lineno)
-	while read -r line; do
-		printf " *     %s: %s: %s: %b\n" \
+	while IFS= read -r line; do
+		printf " *  %s: %s: %s: %b\n" \
 			"${BASH_SOURCE[1]}" \
 			"${FUNCNAME[1]}" \
 			"${BASH_LINENO[0]}" \
 			"${line}"
-	done
+	done < <(
+		if [[ ${#} -gt 0 ]]; then
+			printf "%b\n" "${@}"
+		else
+			cat
+		fi
+	)
 }
 
 cmn::output::traceback() {
@@ -95,10 +94,10 @@ cmn::output::traceback() {
 # Outputs a traceback to stderr.
 #
 
-	printf " !!    Traceback:\n" >&2
+	printf " !! Traceback:\n" >&2
 
 	for (( i=1; i<${#FUNCNAME[@]}; i++ )); do
-		>&2 printf " !!      %s: %s: %s\n" \
+		>&2 printf " !! %s: %s: %s\n" \
 			"${BASH_SOURCE[i]}" \
 			"${FUNCNAME[$i]}" \
 			"${BASH_LINENO[$i-1]}"
@@ -223,7 +222,7 @@ cmn::step::start() {
 # Use this function when the step is about to start.
 #
 
-	printf "%s %b\n" "----->" "${*}"
+	printf "---> %b\n" "${*}"
 }
 
 cmn::step::finish() {
@@ -232,7 +231,7 @@ cmn::step::finish() {
 # Use this function when the step succeeded.
 #
 
-	printf "       %b\n" "Done."
+	printf "    %b\n" "Done."
 }
 
 cmn::step::fail() {
@@ -241,7 +240,7 @@ cmn::step::fail() {
 # Use this function when the step failed.
 #
 
-	printf "       %b\n" "Failed."
+	printf "    %b\n" "Failed."
 }
 
 
@@ -253,7 +252,7 @@ cmn::task::start() {
 # Use this function when the task is about to start.
 #
 
-	echo -n "       $*... "
+	echo -n "    $*... "
 }
 
 cmn::task::finish() {
@@ -324,6 +323,14 @@ cmn::file::check_checksum() {
 			;;
 	esac
 
+	cmn::output::debug <<-EOM
+		file:      ${build_dir}
+		hash_file: ${cache_dir}
+		hash_algo: ${env_dir}
+		ref_hash:  ${buildpack_dir}
+		result:    ${rc}
+	EOM
+
 	return "${rc}"
 }
 
@@ -337,6 +344,10 @@ cmn::file::download() {
 
 	local -r url="${1}"
 	local -r out="${2:-"-"}"
+
+	cmn::output::debug <<-EOM
+		Downloading "${url}" and saving to "${out}".
+	EOM
 
 	curl --silent --fail --retry 3 --location "${url}" --output "${out}"
 
@@ -420,7 +431,7 @@ cmn::str::join() {
 
 cmn::env::read() {
 #
-# Exports configuration variables of a buildpacks ENV_DIR to environment
+# Exports configuration variables of a buildpack's ENV_DIR to environment
 # variables.
 #
 # Only configuration variables which names pass the positive pattern and don't
@@ -499,9 +510,6 @@ cmn::bp::run() {
 				# shellcheck disable=SC1091
 				source "${bp_dir}/export"
 			fi
-
-			# Silently remove the buildpack temporary directory:
-			rm --recursive --force "${bp_dir}"
 
 			rc=0
 		fi

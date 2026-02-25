@@ -10,14 +10,14 @@ test::output::info() {
 	test::utils::capture cmn::output::info "Hello World!"
 
 	test::utils::assertSuccess
-	test::utils::assertStdoutMatches "       Hello World!"
+	test::utils::assertStdoutMatches "    Hello World!"
 	test::utils::assertStderrMatches ""
 }
 
 test::output::info_multiline() {
 	local expected
-	expected="       Hello World!
-       On multiple lines."
+	expected="    Hello World!
+    On multiple lines."
 
 	test::utils::capture cmn::output::info <<- EOM
 		Hello World!
@@ -29,18 +29,38 @@ test::output::info_multiline() {
 	test::utils::assertStderrMatches ""
 }
 
+test::output::info_in_loop() {
+	local expected
+	expected="    Hello
+    World
+    on multiple lines."
+
+	fn() {
+		local s
+		for s in "Hello" "World" "on multiple lines."; do
+			cmn::output::info "${s}"
+		done
+	}
+
+	test::utils::capture fn
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches "${expected}"
+	test::utils::assertStderrMatches ""
+}
+
 test::output::warn() {
 	test::utils::capture cmn::output::warn "Warning!"
 
 	test::utils::assertSuccess
-	test::utils::assertStdoutMatches " !     Warning!"
+	test::utils::assertStdoutMatches " !  Warning!"
 	test::utils::assertStderrMatches ""
 }
 
 test::output::warn_multiline() {
 	local expected
-	expected=" !     Warning 1!
- !     Warning 2!"
+	expected=" !  Warning 1!
+ !  Warning 2!"
 	
 	test::utils::capture cmn::output::warn <<- EOM
 		Warning 1!
@@ -57,13 +77,13 @@ test::output::err() {
 
 	test::utils::assertSuccess
 	test::utils::assertStdoutMatches ""
-	test::utils::assertStderrMatches " !!    Error!"
+	test::utils::assertStderrMatches " !! Error!"
 }
 
 test::output::err_multiline() {
 	local expected
-	expected=" !!    Error 1!
- !!    Error 2!"
+	expected=" !! Error 1!
+ !! Error 2!"
 	
 	test::utils::capture cmn::output::err <<- EOM
 		Error 1!
@@ -77,11 +97,9 @@ test::output::err_multiline() {
 
 test::output::debug() {
 	local expected
-	expected="
- \*     .*test/utils: test::utils::capture: [0-9]+: Debug"
+	expected=" \*  .*test/utils: test::utils::capture: [0-9]+: Debug"
 
-	# Make sure BUILDPACK_DEBUG is set:
-	export DEBUG="yes"
+	export _CMN_DEBUG_="yes"
 	test::utils::capture cmn::output::debug "Debug"
 
 	test::utils::assertSuccess
@@ -91,12 +109,10 @@ test::output::debug() {
 
 test::output::debug_multiline() {
 	local expected
-	expected="
- \*     .*test/utils: test::utils::capture: [0-9]+: Debug 1!
- \*     .*test/utils: test::utils::capture: [0-9]+: Debug 2!"
+	expected=" \*  .*test/utils: test::utils::capture: [0-9]+: Debug 1!
+ \*  .*test/utils: test::utils::capture: [0-9]+: Debug 2!"
 
-	# Make sure BUILDPACK_DEBUG is set:
-	export BUILDPACK_DEBUG="yes"
+	export _CMN_DEBUG_="yes"
 	test::utils::capture cmn::output::debug <<- EOM
 		Debug 1!
 		Debug 2!
@@ -119,12 +135,12 @@ test::output::debug_not_enabled() {
 
 test::output::traceback() {
 	local expected
-    expected=" !!    Traceback:
- !!      .*test\/utils: test::utils::capture: [0-9]+
- !!      .*test\/tests: test::output::traceback: [0-9]+
- !!      .*test\/shunit2: _shunit_execSuite: 1057
- !!      .*test\/shunit2: source: 1331
- !!      .*test\/run: main: [0-9]+"
+    expected=" !! Traceback:
+ !! .*test\/utils: test::utils::capture: [0-9]+
+ !! .*test\/tests: test::output::traceback: [0-9]+
+ !! .*test\/shunit2: _shunit_execSuite: 1057
+ !! .*test\/shunit2: source: 1331
+ !! .*test\/run: main: [0-9]+"
 
 	test::utils::capture cmn::output::traceback
 
@@ -138,6 +154,7 @@ test::output::traceback() {
 
 suite_addTest test::output::info
 suite_addTest test::output::info_multiline
+suite_addTest test::output::info_in_loop
 suite_addTest test::output::warn
 suite_addTest test::output::warn_multiline
 suite_addTest test::output::err
