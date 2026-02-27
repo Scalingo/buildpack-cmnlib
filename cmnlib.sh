@@ -1,25 +1,47 @@
 #!/usr/bin/env bash
 
+_cmn__read_lines() {
+#
+# --- Internal only ---
+# Redirects input to stdin, line by line.
+# This allows the `cmn::ouput::` functions to support heredoc.
+#
+
+	if (($#)); then
+		printf '%s\n' "$@"
+	else
+		cat
+	fi
+}
+
+_cmn__output_emit() {
+#
+# --- Internal only ---
+# Reads input line by line thanks to `_cmn__read_lines`
+# and outputs each line formatted on the appropriate file descriptor.
+#
+# Calls `_cmn__read_lines`
+#
+
+	local -r prefix="${1}"; shift
+	# Use 1 for stdout, 2 for stderr
+	# Defaults to stdout:
+	local -r fd="${1:-1}"
+	shift || true
+
+	while IFS= read -r line; do
+		printf '%s%s\n' "${prefix}" "${line}" >&"${fd}"
+	done < <(_cmn__read_lines "$@")
+}
+
 cmn::output::info() {
 #
 # Outputs an informational message on stdout.
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	while IFS= read -r line; do
-		# Apply formatting:
-		printf "    %b\n" "${line}"
-	done < <(
-		if [[ ${#} -gt 0 ]]; then
-			# When we have multiple arguments,
-			# send them one by one to the `while` loop.
-			printf "%b\n" "${@}"
-		else
-			# Calling `cat` without arguments redirects stdin to stdout
-			# This allows to support heredoc.
-			cat
-		fi
-	)
+	local -r prefix="    "
+	_cmn__output_emit "${prefix}" 1 "${@}"
 }
 
 cmn::output::warn() {
@@ -28,15 +50,8 @@ cmn::output::warn() {
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	while IFS= read -r line; do
-		printf " !  %b\n" "${line}"
-	done < <(
-		if [[ ${#} -gt 0 ]]; then
-			printf "%b\n" "${@}"
-		else
-			cat
-		fi
-	)
+	local -r prefix=" !  "
+	_cmn__output_emit "${prefix}" 1 "${@}"
 }
 
 cmn::output::err() {
@@ -45,17 +60,10 @@ cmn::output::err() {
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	while IFS= read -r line; do
-		printf " !! %b\n" "${line}" >&2
-	done < <(
-		if [[ ${#} -gt 0 ]]; then
-			printf "%b\n" "${@}"
-		else
-			cat
-		fi
-	)
+	local -r prefix=" !! "
+	_cmn__output_emit "${prefix}" 2 "${@}"
 
-	if [[ -n "${_CMN_DEBUG_}" ]]; then
+	if [ -n "${_CMN_DEBUG_:-}" ]; then
 		cmn::output::traceback
 	fi
 }
@@ -72,7 +80,7 @@ cmn::output::debug() {
 #
 
 	# Return ASAP if _CMN_DEBUG_ isn't set
-	[[ -z "${_CMN_DEBUG_}" ]] && return
+	[[ -z "${_CMN_DEBUG_:-}" ]] && return
 
 	while IFS= read -r line; do
 		printf " *  %s: %s: %s: %b\n" \
@@ -80,13 +88,7 @@ cmn::output::debug() {
 			"${FUNCNAME[1]}" \
 			"${BASH_LINENO[0]}" \
 			"${line}"
-	done < <(
-		if [[ ${#} -gt 0 ]]; then
-			printf "%b\n" "${@}"
-		else
-			cat
-		fi
-	)
+	done < <( _cmn__read_lines "${@}" )
 }
 
 cmn::output::traceback() {
@@ -283,7 +285,7 @@ cmn::file::check_checksum() {
 #
 # Computes the checksum of a file and checks that it matches the one stored in
 # the reference file.
-# md5, sha1 and sha256 hashing algorithm are currently supported.
+# md5, sha1, sha256, and sha512 hashing algorithm are currently supported.
 #
 # $1: file
 # $2: checksum file
@@ -293,28 +295,33 @@ cmn::file::check_checksum() {
 	local -r hash_file="${2}"
 
 	local -r hash_algo="${hash_file##*.}"
-	local -r ref_hash="$( cut -d " " -f 1 < "${hash_file}" )"
+
+	read -r ref_hash _ < "${hash_file}"
 
 	local rc=1
 
 	case "${hash_algo}" in
 		"sha1")
-			shasum --algorithm 1 --check --status <<< "${ref_hash}  ${file}"
+			printf '%s  %s\n' "${ref_hash}" "${file}" \
+				| shasum --algorithm 1 --check --status
 			rc="${?}"
 			;;
 
 		"sha256")
-			shasum --algorithm 256 --check --status <<< "${ref_hash}  ${file}"
+			printf '%s  %s\n' "${ref_hash}" "${file}" \
+				| shasum --algorithm 256 --check --status
 			rc="${?}"
 			;;
 
 		"sha512")
-			shasum --algorithm 512 --check --status <<< "${ref_hash}  ${file}"
+			printf '%s  %s\n' "${ref_hash}" "${file}" \
+				| shasum --algorithm 512 --check --status
 			rc="${?}"
 			;;
 
 		"md5")
-		    md5sum --check --status <<< "${ref_hash}  ${file}"
+			printf '%s  %s\n' "${ref_hash}" "${file}" \
+		    	| md5sum --check --status
 			rc="${?}"
 			;;
 
@@ -324,10 +331,10 @@ cmn::file::check_checksum() {
 	esac
 
 	cmn::output::debug <<-EOM
-		file:      ${build_dir}
-		hash_file: ${cache_dir}
-		hash_algo: ${env_dir}
-		ref_hash:  ${buildpack_dir}
+		file:      ${file}
+		hash_file: ${hash_file}
+		hash_algo: ${hash_algo}
+		ref_hash:  ${ref_hash}
 		result:    ${rc}
 	EOM
 
