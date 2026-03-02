@@ -115,7 +115,8 @@ cmn::trap::setup() {
 # when it happens.
 #
 
-	trap cmn::main::fail EXIT SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+	trap cmn::main::fail ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+	trap cmn::main::end EXIT
 }
 
 cmn::trap::teardown() {
@@ -124,7 +125,7 @@ cmn::trap::teardown() {
 # `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
 #
 
-	trap - EXIT SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+	trap - EXIT ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
 }
 
 
@@ -138,8 +139,7 @@ cmn::main::start() {
 # Use this function at the beginning of the buildpack.
 #
 
-	set -o errexit
-	set -o pipefail
+	set -o errexit -o pipefail
 
 	if [ -n "${BUILDPACK_DEBUG}" ]; then
 		set -o xtrace
@@ -176,7 +176,13 @@ cmn::main::end() {
 
 	cmn::trap::teardown
 
+	# Ensure we are back in $build_dir:
 	pushd "${build_dir}" > /dev/null
+
+	# Remove $tmp_dir:
+	if [ -d "${tmp_dir}" ]; then
+		rm -rf -- "${tmp_dir}"
+	fi
 
 	unset build_dir
 	unset cache_dir
@@ -190,12 +196,11 @@ cmn::main::finish() {
 #
 # Outputs a success message and exits with a `0` return code, thus
 # instructing the platform that the buildpack ran successfully.
-# Calls `cmn::main::end`.
+#
 # Use this function as the last instruction of the buildpack, when it
 # succeeded.
 #
 
-	cmn::main::end
 	printf "\n%b\n" "All done."
 	exit 0
 }
@@ -205,12 +210,11 @@ cmn::main::fail() {
 # Outputs an error message and exits with a `1` return code, thus
 # instructing the platform that the buildpack failed (and so did the
 # build).
-# Calls `cmn::main::end`.
+#
 # Use this function as the last instruction of the buildpack, when it
 # failed.
 #
 
-	cmn::main::end
 	printf "\n%b\n" "Failed." >&2
 	exit 1
 }
@@ -530,6 +534,7 @@ cmn::bp::run() {
 readonly -f cmn::output::info
 readonly -f cmn::output::warn
 readonly -f cmn::output::err
+readonly -f cmn::output::debug
 readonly -f cmn::output::traceback
 
 readonly -f cmn::trap::setup
@@ -558,3 +563,6 @@ readonly -f cmn::env::read
 readonly -f cmn::env::list
 
 readonly -f cmn::bp::run
+
+readonly -f _cmn__read_lines
+readonly -f _cmn__output_emit
