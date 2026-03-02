@@ -258,7 +258,7 @@ cmn::task::start() {
 # Use this function when the task is about to start.
 #
 
-	echo -n "    $*... "
+	printf "    %s... " "$*"
 }
 
 cmn::task::finish() {
@@ -325,7 +325,7 @@ cmn::file::check_checksum() {
 
 		"md5")
 			printf '%s  %s\n' "${ref_hash}" "${file}" \
-		    	| md5sum --check --status
+				| md5sum --check --status
 			rc="${?}"
 			;;
 
@@ -414,12 +414,16 @@ cmn::jobs::wait() {
 #
 
 	local rc=0
+	local pid
 
 	while read -r pid; do
-    	if ! wait "${pid}"; then
+		# If $pid is empty, skip to next loop item:
+		[[ -z "${pid}" ]] && continue
+
+		if ! wait "${pid}"; then
 			(( rc+=1 ))
 		fi
-	done <<< "$( jobs -p )"
+	done < <( jobs -pr )
 
 	return "${rc}"
 }
@@ -428,14 +432,17 @@ cmn::jobs::wait() {
 
 cmn::str::join() {
 	local -r separator="${1}"
+	local res=""
+	local s
 
-	local res
+	for s in "${@}"; do
+		res+="${separator}${s}"
+	done
 
-	res="$( printf "${separator}%s" "${@}" )"
 	# Remove leading separator:
 	res="${res:${#separator}}"
 
-	echo "${res}"
+	printf "%s\n" "${res}"
 }
 
 
