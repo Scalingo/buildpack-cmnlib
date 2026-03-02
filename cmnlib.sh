@@ -115,8 +115,8 @@ cmn::trap::setup() {
 # when it happens.
 #
 
-	trap cmn::main::fail ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
-	trap cmn::main::end EXIT
+	trap "cmn::main::fail" ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+	trap "cmn::main::end" EXIT
 }
 
 cmn::trap::teardown() {
