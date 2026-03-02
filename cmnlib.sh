@@ -360,7 +360,11 @@ cmn::file::download() {
 		Downloading "${url}" and saving to "${out}".
 	EOM
 
-	curl --silent --fail --retry 3 --location "${url}" --output "${out}"
+	curl --silent --fail --location \
+		--retry 3 --retry-delay 10 --retry-connrefused \
+		--connect-timeout 10 --max-time 300 \
+		--output "${out}" \
+		"${url}"
 
 	return "${?}"
 }
