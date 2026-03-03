@@ -29,7 +29,7 @@ _cmn__output_emit() {
 	# Use 1 for stdout, 2 for stderr
 	# Defaults to stdout:
 	local -r fd="${1:-1}"
-	shift
+	shift || true
 
 	while IFS= read -r line; do
 		printf '%s%s\n' "${prefix}" "${line}" >&"${fd}"
@@ -43,6 +43,11 @@ _cmn__main_err() {
 # Handler for unmanaged errors.
 # Please use `cmn::main::finish` or `cmn::main::fail` instead.
 #
+
+	# We don't want to be caught in an err loop:
+	# so stop trapping ERR ASAP:
+	set +o errexit
+	trap - ERR
 
 	local -r code="${1:-1}"
 	local -r cmd="${2:-""}"
@@ -70,13 +75,13 @@ _cmn__main_end() {
 
 	_cmn__trap_teardown
 
-	# Ensure we are back in $build_dir:
-	pushd "${build_dir}" > /dev/null
+	# Ensure we are back in build_dir:
+	[[ -n "${build_dir:-}" && -d "${build_dir}" ]] \
+		&& pushd "${build_dir}" > /dev/null || true
 
-	# Remove $tmp_dir:
-	if [ -d "${tmp_dir}" ]; then
-		rm -rf -- "${tmp_dir}"
-	fi
+	# Remove tmp_dir:
+	[[ -n "${tmp_dir:-}" && -d "${tmp_dir}" ]] \
+		&& rm -rf -- "${tmp_dir}" || true
 }
 
 _cmn__trap_setup() {
@@ -327,6 +332,7 @@ cmn::file::validate_checksum() {
 	local -r hash_file="${2}"
 
 	local -r hash_algo="${hash_file##*.}"
+	local ref_hash
 
 	if ! read -r ref_hash _ < "${hash_file}"; then
 		return 2
@@ -487,18 +493,19 @@ cmn::env::read() {
 # Only configuration variables which names pass the positive pattern and don't
 # match the negative pattern are exported.
 #
-# Calls `cmn::env::list`
-#
 
 	local -r env_dir="${1}"
-	local -r env_vars="$( cmn::env::list "${env_dir}" )"
+	local e
+	local value
 
-	while read -r e; do
-		local value
-		value="$( cat "${env_dir}/${e}" )"
-
+	while IFS= read -r e; do
+		# Read env var value from file:
+		value="$( <"${env_dir}/${e}" )"
+		# Remove potential ending new line:
+		value="${value%$'\n'}"
+		# Export the env var:
 		export "${e}=${value}"
-	done <<< "${env_vars}"
+	done < <(cmn::env::list "${env_dir}")
 }
 
 cmn::env::list() {
