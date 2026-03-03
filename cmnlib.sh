@@ -2,43 +2,70 @@
 
 _cmn__read_lines() {
 #
-# --- Internal only ---
+## Internal only
+#
 # Redirects input to stdin, line by line.
 # This allows the `cmn::ouput::` functions to support heredoc.
 #
 
 	if (($#)); then
 		printf '%s\n' "$@"
-	else
+	elif [[ ! -t 0 ]]; then
+		# stdin is not a terminal, we can safely call `cat` without arguments.
+		# This redirects stdin to stdout.
 		cat
 	fi
 }
 
 _cmn__output_emit() {
 #
-# --- Internal only ---
+## Internal only
+#
 # Reads input line by line thanks to `_cmn__read_lines`
 # and outputs each line formatted on the appropriate file descriptor.
-#
-# Calls `_cmn__read_lines`
 #
 
 	local -r prefix="${1}"; shift
 	# Use 1 for stdout, 2 for stderr
 	# Defaults to stdout:
 	local -r fd="${1:-1}"
-	shift || true
+	shift
 
 	while IFS= read -r line; do
 		printf '%s%s\n' "${prefix}" "${line}" >&"${fd}"
 	done < <(_cmn__read_lines "$@")
 }
 
+_cmn__main_err() {
+#
+## Internal only
+#
+# Handler for unmanaged errors.
+# Please use `cmn::main::finish` or `cmn::main::fail` instead.
+#
+
+	local -r code="${1:-1}"
+	local -r cmd="${2:-""}"
+
+	cmn::task::fail
+
+    cmn::output::err <<-EOM
+	Caught Error:
+	  Command: ${cmd}
+	     Exit: ${code}
+	EOM
+
+	cmn::output::traceback
+
+	exit "${code}"
+}
+
 _cmn__main_end() {
 #
-# --- Internal only ---
-# Please use `cmn::main::finish` or `cmn::main::fail`.
-# Calls `_cmn__trap_teardown`.
+## Internal only
+#
+# Handler for EXIT signal.
+# Please use `cmn::main::finish` or `cmn::main::fail` instead.
 #
 
 	_cmn__trap_teardown
@@ -54,19 +81,29 @@ _cmn__main_end() {
 
 _cmn__trap_setup() {
 #
-# --- Internal only ---
-# Instructs the buildpack to catch the `EXIT`, `SIGHUP`, `SIGINT`,
-# `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals and to call `cmn::main::fail`
+## Internal only
+#
+# Instructs the buildpack to catch the `SIGHUP`, `SIGINT`, `SIGQUIT`,
+# `SIGABRT`, and `SIGTERM` signals and to call `cmn::main::fail`
+# when it happens.
+# Also instructs the buildpack to catch `EXIT` and to call `_cmn__main_end`
 # when it happens.
 #
 
-	trap "cmn::main::fail" ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+	trap '_cmn__main_err $? "$BASH_COMMAND"' ERR
+	trap '_cmn__main_err 129 "SIGHUP"'  HUP
+	trap '_cmn__main_err 130 "SIGINT"'  INT
+	trap '_cmn__main_err 131 "SIGQUIT"' QUIT
+	trap '_cmn__main_err 134 "SIGABRT"' ABRT
+	trap '_cmn__main_err 143 "SIGTERM"' TERM
+
 	trap "_cmn__main_end" EXIT
 }
 
 _cmn__trap_teardown() {
 #
-# --- Internal only ---
+## Internal only
+#
 # Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
 # `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
 #
@@ -141,7 +178,7 @@ cmn::output::traceback() {
 	printf " !! Traceback:\n" >&2
 
 	for (( i=1; i<${#FUNCNAME[@]}; i++ )); do
-		>&2 printf " !! %s: %s: %s\n" \
+		>&2 printf " !!   %s: %s: %s\n" \
 			"${BASH_SOURCE[i]}" \
 			"${FUNCNAME[$i]}" \
 			"${BASH_LINENO[$i-1]}"
@@ -159,7 +196,7 @@ cmn::main::start() {
 # Use this function at the beginning of the buildpack.
 #
 
-	set -o errexit -o pipefail
+	set -o errexit -o errtrace -o pipefail
 
 	if [[ -n "${BUILDPACK_DEBUG:-}" ]]; then
 		set -o xtrace
@@ -190,7 +227,7 @@ cmn::main::start() {
 
 	pushd "${build_dir}" > /dev/null
 
-	cmn::trap::setup
+	_cmn__trap_setup
 }
 
 cmn::main::finish() {
@@ -206,21 +243,29 @@ cmn::main::finish() {
 	exit 0
 }
 
+
 cmn::main::fail() {
 #
-# Outputs an error message and exits with a `1` return code, thus
+# Outputs an error message if given and exits with the given return code, thus
 # instructing the platform that the buildpack failed (and so did the
 # build).
 #
-# Use this function as the last instruction of the buildpack, when it
-# failed.
+# When no return code is given, defaults to 1.
+#
+# Use this function to end the buildpack, when it encountered an unrecoverable
+# failure.
+#
+# Calls `cmn::output::err`
 #
 
-	printf "\n%s\n" "Failed." >&2
-	exit 1
+	local -r code="${1:-1}"
+	shift
+
+	cmn::task::fail
+	cmn::output::err "${@}"
+
+	exit "${code}"
 }
-
-
 
 cmn::step::start() {
 #
@@ -229,25 +274,7 @@ cmn::step::start() {
 # Use this function when the step is about to start.
 #
 
-	printf "---> %s\n" "${*}"
-}
-
-cmn::step::finish() {
-#
-# Outputs a success message marking the end of a buildpack step.
-# Use this function when the step succeeded.
-#
-
-	printf "    %s\n" "Done."
-}
-
-cmn::step::fail() {
-#
-# Outputs an error message marking the end of a buildpack step.
-# Use this function when the step failed.
-#
-
-	printf "    %s\n" "Failed."
+	printf -- "--> %s\n" "${*}"
 }
 
 
@@ -259,7 +286,7 @@ cmn::task::start() {
 # Use this function when the task is about to start.
 #
 
-	printf "    %s... " "$*"
+	printf -- "    %s... " "$*"
 }
 
 cmn::task::finish() {
@@ -268,7 +295,7 @@ cmn::task::finish() {
 # Use this function when the task succeeded.
 #
 
-	printf "%s\n" "OK."
+	printf -- "%s\n" "OK."
 }
 
 cmn::task::fail() {
@@ -277,7 +304,7 @@ cmn::task::fail() {
 # Calls `cmn::ouput::err` with `$1` when `$1` is set.
 #
 
-	printf "%s\n" "Failed."
+	printf -- "%s\n" "Failed."
 
 	if [[ -n "${1}" ]]; then
 		cmn::output::err "${1}"
@@ -556,8 +583,6 @@ readonly -f cmn::main::finish
 readonly -f cmn::main::fail
 
 readonly -f cmn::step::start
-readonly -f cmn::step::finish
-readonly -f cmn::step::fail
 
 readonly -f cmn::task::start
 readonly -f cmn::task::finish
@@ -576,6 +601,7 @@ readonly -f cmn::bp::run
 
 readonly -f _cmn__read_lines
 readonly -f _cmn__output_emit
+readonly -f _cmn__main_err
 readonly -f _cmn__main_end
 readonly -f _cmn__trap_setup
 readonly -f _cmn__trap_teardown
