@@ -34,6 +34,48 @@ _cmn__output_emit() {
 	done < <(_cmn__read_lines "$@")
 }
 
+_cmn__main_end() {
+#
+# --- Internal only ---
+# Please use `cmn::main::finish` or `cmn::main::fail`.
+# Calls `_cmn__trap_teardown`.
+#
+
+	_cmn__trap_teardown
+
+	# Ensure we are back in $build_dir:
+	pushd "${build_dir}" > /dev/null
+
+	# Remove $tmp_dir:
+	if [ -d "${tmp_dir}" ]; then
+		rm -rf -- "${tmp_dir}"
+	fi
+}
+
+_cmn__trap_setup() {
+#
+# --- Internal only ---
+# Instructs the buildpack to catch the `EXIT`, `SIGHUP`, `SIGINT`,
+# `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals and to call `cmn::main::fail`
+# when it happens.
+#
+
+	trap "cmn::main::fail" ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+	trap "_cmn__main_end" EXIT
+}
+
+_cmn__trap_teardown() {
+#
+# --- Internal only ---
+# Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
+# `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
+#
+
+	trap - EXIT ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+}
+
+
+
 cmn::output::info() {
 #
 # Outputs an informational message on stdout.
@@ -83,7 +125,7 @@ cmn::output::debug() {
 	[[ -z "${_CMN_DEBUG_:-}" ]] && return
 
 	while IFS= read -r line; do
-		printf " *  %s: %s: %s: %b\n" \
+		printf " *  %s: %s: %s: %s\n" \
 			"${BASH_SOURCE[1]}" \
 			"${FUNCNAME[1]}" \
 			"${BASH_LINENO[0]}" \
@@ -108,28 +150,6 @@ cmn::output::traceback() {
 
 
 
-cmn::trap::setup() {
-#
-# Instructs the buildpack to catch the `EXIT`, `SIGHUP`, `SIGINT`,
-# `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals and to call `cmn::main::fail`
-# when it happens.
-#
-
-	trap "cmn::main::fail" ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
-	trap "cmn::main::end" EXIT
-}
-
-cmn::trap::teardown() {
-#
-# Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
-# `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
-#
-
-	trap - EXIT ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
-}
-
-
-
 cmn::main::start() {
 #
 # Configures Bash options, populates a few global variables and marks the
@@ -141,7 +161,7 @@ cmn::main::start() {
 
 	set -o errexit -o pipefail
 
-	if [ -n "${BUILDPACK_DEBUG}" ]; then
+	if [[ -n "${BUILDPACK_DEBUG:-}" ]]; then
 		set -o xtrace
 	fi
 
@@ -152,6 +172,13 @@ cmn::main::start() {
 	base_dir="$( cd -P "$( dirname "${1}" )" && pwd )"
 	buildpack_dir="$( readlink -f "${base_dir}/.." )"
 	tmp_dir="$( mktemp --directory --tmpdir="/tmp" --quiet "bp-XXXXXX" )"
+
+	readonly build_dir
+	readonly cache_dir
+	readonly env_dir
+	readonly base_dir
+	readonly buildpack_dir
+	readonly tmp_dir
 
 	cmn::output::debug <<-EOM
 		build_dir:     ${build_dir}
@@ -166,32 +193,6 @@ cmn::main::start() {
 	cmn::trap::setup
 }
 
-cmn::main::end() {
-#
-# /!\ Not to be called directly /!\
-#
-# Please use `cmn::main::finish` or `cmn::main::fail` instead.
-# Calls `cmn::trap::teardown`.
-#
-
-	cmn::trap::teardown
-
-	# Ensure we are back in $build_dir:
-	pushd "${build_dir}" > /dev/null
-
-	# Remove $tmp_dir:
-	if [ -d "${tmp_dir}" ]; then
-		rm -rf -- "${tmp_dir}"
-	fi
-
-	unset build_dir
-	unset cache_dir
-	unset env_dir
-	unset base_dir
-	unset buildpack_dir
-	unset tmp_dir
-}
-
 cmn::main::finish() {
 #
 # Outputs a success message and exits with a `0` return code, thus
@@ -201,7 +202,7 @@ cmn::main::finish() {
 # succeeded.
 #
 
-	printf "\n%b\n" "All done."
+	printf "\n%s\n" "All done."
 	exit 0
 }
 
@@ -215,7 +216,7 @@ cmn::main::fail() {
 # failed.
 #
 
-	printf "\n%b\n" "Failed." >&2
+	printf "\n%s\n" "Failed." >&2
 	exit 1
 }
 
@@ -228,7 +229,7 @@ cmn::step::start() {
 # Use this function when the step is about to start.
 #
 
-	printf "---> %b\n" "${*}"
+	printf "---> %s\n" "${*}"
 }
 
 cmn::step::finish() {
@@ -237,7 +238,7 @@ cmn::step::finish() {
 # Use this function when the step succeeded.
 #
 
-	printf "    %b\n" "Done."
+	printf "    %s\n" "Done."
 }
 
 cmn::step::fail() {
@@ -246,7 +247,7 @@ cmn::step::fail() {
 # Use this function when the step failed.
 #
 
-	printf "    %b\n" "Failed."
+	printf "    %s\n" "Failed."
 }
 
 
@@ -267,7 +268,7 @@ cmn::task::finish() {
 # Use this function when the task succeeded.
 #
 
-	echo "OK."
+	printf "%s\n" "OK."
 }
 
 cmn::task::fail() {
@@ -276,7 +277,7 @@ cmn::task::fail() {
 # Calls `cmn::ouput::err` with `$1` when `$1` is set.
 #
 
-	echo "Failed."
+	printf "%s\n" "Failed."
 
 	if [[ -n "${1}" ]]; then
 		cmn::output::err "${1}"
@@ -306,26 +307,22 @@ cmn::file::check_checksum() {
 
 	case "${hash_algo}" in
 		"sha1")
-			printf '%s  %s\n' "${ref_hash}" "${file}" \
-				| shasum --algorithm 1 --check --status
+			shasum --algorithm 1 --check --status <<< "${ref_hash}  ${file}"
 			rc="${?}"
 			;;
 
 		"sha256")
-			printf '%s  %s\n' "${ref_hash}" "${file}" \
-				| shasum --algorithm 256 --check --status
+			shasum --algorithm 256 --check --status <<< "${ref_hash}  ${file}"
 			rc="${?}"
 			;;
 
 		"sha512")
-			printf '%s  %s\n' "${ref_hash}" "${file}" \
-				| shasum --algorithm 512 --check --status
+			shasum --algorithm 512 --check --status <<< "${ref_hash}  ${file}"
 			rc="${?}"
 			;;
 
 		"md5")
-			printf '%s  %s\n' "${ref_hash}" "${file}" \
-				| md5sum --check --status
+			md5sum --check --status <<< "${ref_hash}  ${file}"
 			rc="${?}"
 			;;
 
@@ -435,7 +432,13 @@ cmn::jobs::wait() {
 
 
 cmn::str::join() {
+#
+# Joins all items into one string, using the given separator as separator.
+#
+
 	local -r separator="${1}"
+	shift
+
 	local res=""
 	local s
 
@@ -446,7 +449,7 @@ cmn::str::join() {
 	# Remove leading separator:
 	res="${res:${#separator}}"
 
-	printf "%s\n" "${res}"
+	printf "%s" "${res}"
 }
 
 
@@ -548,11 +551,7 @@ readonly -f cmn::output::err
 readonly -f cmn::output::debug
 readonly -f cmn::output::traceback
 
-readonly -f cmn::trap::setup
-readonly -f cmn::trap::teardown
-
 readonly -f cmn::main::start
-readonly -f cmn::main::end
 readonly -f cmn::main::finish
 readonly -f cmn::main::fail
 
@@ -577,3 +576,6 @@ readonly -f cmn::bp::run
 
 readonly -f _cmn__read_lines
 readonly -f _cmn__output_emit
+readonly -f _cmn__main_end
+readonly -f _cmn__trap_setup
+readonly -f _cmn__trap_teardown
