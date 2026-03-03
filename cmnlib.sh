@@ -542,35 +542,37 @@ cmn::bp::run() {
 	local -r cache_dir="${3}"
 	local -r env_dir="${4}"
 
-	local rc=1
+	local rc=0
 	local bp_dir
 
 	if ! bp_dir="$( mktemp --directory --tmpdir="/tmp" \
-						--quiet "sub_bp-XXXXXX" )"; then
-		return "${rc}"
-	fi
-
-	# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
-	# instead of asking for credentials
-	if ! GIT_TERMINAL_PROMPT=0 \
+			--quiet "sub_bp-XXXXXX" )"
+	then
+		rc=1
+	else
+		# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
+		# instead of asking for credentials
+		if ! GIT_TERMINAL_PROMPT=0 \
 			git clone --quiet --depth=1 "${buildpack_url}" "${bp_dir}" \
 				2>/dev/null
-	then
-		rc=2
-	else
-		if ! "${bp_dir}/bin/compile" "${build_dir}" "${cache_dir}" "${env_dir}"
 		then
-			rc="${?}"
+			rc=2
 		else
-			# Source `export` file if it exists:
-			if [[ -f "${bp_dir}/export" ]]; then
-				# shellcheck disable=SC1091
-				source "${bp_dir}/export"
+			if ! "${bp_dir}/bin/compile" \
+				"${build_dir}" "${cache_dir}" "${env_dir}"
+			then
+				rc=3
+			else
+				# Source `export` file if it exists:
+				if [[ -f "${bp_dir}/export" ]]; then
+					# shellcheck disable=SC1091
+					source "${bp_dir}/export"
+				fi
 			fi
-
-			rc=0
 		fi
 	fi
+
+	rm -rf -- "${bp_dir}"
 
 	return "${rc}"
 }
