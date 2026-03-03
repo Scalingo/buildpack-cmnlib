@@ -313,7 +313,7 @@ cmn::task::fail() {
 
 
 
-cmn::file::check_checksum() {
+cmn::file::validate_checksum() {
 #
 # Computes the checksum of a file and checks that it matches the one stored in
 # the reference file.
@@ -328,7 +328,9 @@ cmn::file::check_checksum() {
 
 	local -r hash_algo="${hash_file##*.}"
 
-	read -r ref_hash _ < "${hash_file}"
+	if ! read -r ref_hash _ < "${hash_file}"; then
+		return 2
+	fi
 
 	local rc=1
 
@@ -354,7 +356,7 @@ cmn::file::check_checksum() {
 			;;
 
 		*)
-			rc=2
+			rc=3
 			;;
 	esac
 
@@ -401,10 +403,6 @@ cmn::file::download_and_check() {
 # Finally checks the hash of the downloaded file against the downloaded
 # checksum.
 #
-# Calls `cmn::file::download`
-# Calls `cmn::file::check_checksum`
-# Calls `cmn::jobs::wait`
-#
 # $1: file URL
 # $2: checksum URL
 # $3: file path (where to store the downloaded file)
@@ -422,7 +420,7 @@ cmn::file::download_and_check() {
 	cmn::file::download "${hash_url}" "${hash_path}" &
 
 	if cmn::jobs::wait; then
-		cmn::file::check_checksum "${file_path}" "${hash_path}"
+		cmn::file::validate_checksum "${file_path}" "${hash_path}"
 		rc="${?}"
 	fi
 
@@ -588,7 +586,7 @@ readonly -f cmn::task::start
 readonly -f cmn::task::finish
 readonly -f cmn::task::fail
 
-readonly -f cmn::file::check_checksum
+readonly -f cmn::file::validate_checksum
 readonly -f cmn::file::download
 readonly -f cmn::file::download_and_check
 
