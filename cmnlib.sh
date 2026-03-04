@@ -469,29 +469,6 @@ cmn::jobs::wait() {
 
 
 
-cmn::str::join() {
-#
-# Joins all items into one string, using the given separator as separator.
-#
-
-	local -r separator="${1}"
-	shift
-
-	local res=""
-	local s
-
-	for s in "${@}"; do
-		res+="${separator}${s}"
-	done
-
-	# Remove leading separator:
-	res="${res:${#separator}}"
-
-	printf "%s" "${res}"
-}
-
-
-
 cmn::env::read() {
 #
 # Exports configuration variables of a buildpack's ENV_DIR to environment
@@ -607,8 +584,6 @@ readonly -f cmn::task::fail
 readonly -f cmn::file::validate_checksum
 readonly -f cmn::file::download
 readonly -f cmn::file::download_and_check
-
-readonly -f cmn::str::join
 
 readonly -f cmn::env::read
 readonly -f cmn::env::list

@@ -435,38 +435,6 @@ fi
 
 * * *
 
-### String Functions
-
-#### **`cmn::str::join`**
-
-Outputs a string by joining all the arguments, separated by the given
-separator.
-
-<details>
-<summary>Examples</summary>
-
-```bash
-# With:
-arr=( "one" "two" "three" )
-
-# Calling:
-cmn::str::join "," "${arr[@]}"
-
-# Would output:
-one,two,three
-```
-
-```bash
-# Calling:
-cmn::str::join "-" "one" "two" "three" "four"
-
-# Would output:
-one-two-three-four
-```
-</details>
-
-* * *
-
 ### Environment Functions
 
 #### **`cmn::env::read`**
@@ -483,8 +451,6 @@ Lists available environement variables stored as files in `$ENV_DIR`.\
 A few environment variables are ignored: `PATH`, `GIT_DIR`, `CPATH`, `CPPATH`,
 `LD_PRELOAD`, `LIBRARY_PATH`, `LD_LIBRARY_PATH`, `JAVA_OPTS`,
 `JAVA_TOOL_OPTIONS`, `BUILDPACK_URL` and `BUILD_DIR`.
-
-Calls [`cmn::str::join`](#cmnstrjoin).
 
 * * *
 
