@@ -29,7 +29,6 @@ of the buildpack to import the library:
 #!/usr/bin/env bash
 # usage: bin/compile <build_dir> <cache_dir> <env_dir>
 
-# shellcheck disable=SC1090
 source "$( readlink -f "$( dirname "${0}" )/../vendor/cmnlib.sh" )"
 ```
 

@@ -170,7 +170,7 @@ cmn::output::err() {
 	fi
 }
 
-# shellcheck disable=2120
+# shellcheck disable=SC2120
 cmn::output::debug() {
 #
 # Outputs a debug message on stdout.
@@ -180,6 +180,7 @@ cmn::output::debug() {
 # Setting _CMN_DEBUG_ should be reserved for cmnlib itself,
 # or when debugging buildpacks.
 #
+# Since providing args is optional, disable SC2120.
 
 	# Return ASAP if _CMN_DEBUG_ isn't set
 	[[ -z "${_CMN_DEBUG_:-}" ]] && return
@@ -328,7 +329,7 @@ cmn::task::fail() {
 # Outputs an error message marking the end of a task.
 # Calls `cmn::output::err` with `$1` when `$1` is set.
 #
-# Since providing an arg is optional, disabled Shellcheck SC2120.
+# Since providing args is optional, disable SC2120.
 #
 
 	if [[ -n "${_CMN_IN_TASK_:-}" ]]; then
