@@ -116,7 +116,7 @@ _cmn__trap_teardown() {
 # `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
 #
 
-	trap - EXIT ERR SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
+	trap - EXIT ERR HUP INT QUIT ABRT TERM
 }
 
 
