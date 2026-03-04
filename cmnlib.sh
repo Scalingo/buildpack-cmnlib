@@ -518,14 +518,13 @@ cmn::env::read() {
 cmn::env::list() {
 
 	local -r env_dir="${1}"
-	local -a blocklist=( PATH GIT_DIR CPATH CPPATH )
-	blocklist+=( LD_PRELOAD LIBRARY_PATH LD_LIBRARY_PATH )
-	blocklist+=( JAVA_OPTS JAVA_TOOL_OPTIONS )
-	blocklist+=( BUILDPACK_URL BUILD_DIR )
 
-	[[ -d "${env_dir}" ]] || return 0
-	
-	local -r block_re="^($( cmn::str::join '|' "${blocklist[@]}" ))$"
+	local -A blocked=(
+		[PATH]=1 [GIT_DIR]=1 [CPATH]=1 [CPPATH]=1
+		[LD_PRELOAD]=1 [LIBRARY_PATH]=1 [LD_LIBRARY_PATH]=1
+		[JAVA_OPTS]=1 [JAVA_TOOL_OPTIONS]=1
+		[BUILDPACK_URL]=1 [BUILD_DIR]=1
+	)
 
 	local f
 	local name
@@ -539,9 +538,9 @@ cmn::env::list() {
 		# For example: f="/app/env/MY_VAR" --> name="MY_VAR"
 		name="${f##*/}"
 
-		# Skip item if matching the regexp:
-		[[ "${name}" =~ ${block_re} ]] && continue
-		
+		# Skip if in blocked:
+		[[ -n "${blocked[${name}]:-}" ]] && continue
+
 		printf '%s\n' "${name}"
 	done
 }
