@@ -8,22 +8,20 @@ prevent code rewriting thanks to commonly used utilities.
 
 ## Installing
 
-The library is available at `https://<s3_url>/<bucket>/<version>/cmnlib.sh`,
-with `<version>` being either `latest` or a specific release.
+Place the `cmnlib.sh` file in a directory named `vendor`, at the root of the
+buildpack.
 
 Place the following instruction at the very beginning of the `bin/compile` file
-of the buildpack to download and import the library:
+of the buildpack to import the library:
 
 ```bash
 #!/usr/bin/env bash
+# usage: bin/compile <build_dir> <cache_dir> <env_dir>
 
-cmnlib_url="https://s3url/bucket/version/cmnlib.sh"
+# shellcheck disable=SC1090
+source "$( readlink -f "$( dirname "${0}" )/../vendor/cmnlib.sh" )"
 
-if ! declare -F cmn::output::info >/dev/null; then
-    source /dev/stdin <<< \
-        "$( curl --silent --location --retry 3 "${cmnlib_url}" \
-        || printf "echo ' 🗙 Unable to load cmnlib, aborting.' >&2 && exit 1"; )"
-fi
+cmn::main::start "${0}" "${1}" "${2}" "${3}"
 ```
 
 
@@ -94,11 +92,12 @@ cmn::output::warn <<- EOM
 Outputs an error message on `stderr`.\
 Can be called with a string argument or with a Bash heredoc.
 
-Calls [`cmn::output::traceback`](#cmnoutputtraceback) when `DEBUG` is set.
+Calls [`cmn::output::traceback`](#cmnoutputtraceback) when the `_CMN_DEBUG_`
+environment variable is set (to any value).
 
 > [!TIP]
-> When the `DEBUG` environment variable is set (to any value), prints out a
-  traceback.
+> When the `_CMN_DEBUG_` environment variable is set (to any value), prints out
+  a traceback.
 
 <details>
 <summary>Examples</summary>
@@ -125,7 +124,7 @@ cmn::output::err <<- EOM
 
 ```bash
 # Calling:
-export DEBUG=yes
+export _CMN_DEBUG_=yes
 cmn::output::err "This is another error."
 
 # Would output:
@@ -142,7 +141,8 @@ Outputs a debug message on `stdout`.\
 Can be called with a string argument or with a Bash heredoc.
 
 > [!WARNING]
-> Only prints out when the `DEBUG` environment variable is set (to any value).
+> Only prints out when the `_CMN_DEBUG_` environment variable is set (to any
+  value).
 
 <details>
 <summary>Examples</summary>
@@ -151,13 +151,13 @@ Can be called with a string argument or with a Bash heredoc.
 # Calling:
 cmn::output::debug "This is a debug message."
 
-# Would be skipped because DEBUG is not set
+# Would be skipped because _CMN_DEBUG_ is not set
 # Would not output anything.
 ```
 
 ```bash
 # Calling:
-export DEBUG=yes
+export _CMN_DEBUG_=yes
 cmn::output::debug "This is a debug message."
 
 # Would output:
@@ -166,7 +166,7 @@ cmn::output::debug "This is a debug message."
 
 ```bash
 # Calling:
-export DEBUG=yes
+export _CMN_DEBUG_=yes
 cmn::output::debug <<- EOM
     This is a debug message.
     That should be useful to understand what's going on.
@@ -198,46 +198,30 @@ cmn::output::traceback
 
 * * *
 
-### Trap Functions
-
-#### **`cmn::trap::setup`**
-
-Instructs the buildpack to catch the `EXIT`, `SIGHUP`, `SIGINT`, `SIGQUIT`,
-`SIGABRT`, and `SIGTERM` signals and to call [`cmn::main::fail`](#cmnmainfail)
-when it happens.
-
-#### **`cmn::trap::teardown`**
-
-Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
-`SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
-
-* * *
-
 ### Flow Functions
 
 #### **`cmn::main::start`**
 
 Configures Bash options, populates a few global variables and marks the
 begining of the buildpack.\
-Sets `errexit` and `pipefail`.
-Populates the following environment variables:
+Sets `errexit`, `errtrace`, and `pipefail`.
+Setup traps for `EXIT`, `ERR`, `HUP`, `INT`, `QUIT`, `ABRT`, and `TERM`.
+Populates the following global variables:
 - `build_dir`: Absolute path to the build directory
 - `cache_dir`: Absolute path to the cache directory
 - `env_dir`: Absolute path to the environment directory
 - `buildpack_dir`: Absolute path to the directory containing the buildpack code
 - `tmp_dir`: Absolute path to a usable temporary directory
 
-Calls [`cmn::trap::setup`](#cmntrapsetup).
-
 > [!TIP]
-> Use this function at the beginning of the buildpack.
+> - Use this function at the beginning of the buildpack.
+> - When the `_CMN_DEBUG_` environment variable is set (to any value), prints
+    out the global variables set before.
 
 #### **`cmn::main::finish`**
 
-Outputs a success message and exits with a `0` return code, thus instructing
+Outputs a success message and exits with a `0` return code, which informs
 the platform that the buildpack ran successfully.
-
-Calls [`cmn::trap::teardown`](#cmntrapteardown).
 
 > [!TIP]
 > Use this function as the last instruction of the buildpack, when it
@@ -245,13 +229,60 @@ Calls [`cmn::trap::teardown`](#cmntrapteardown).
 
 #### **`cmn::main::fail`**
 
-Outputs an error message and exits with a `1` return code, thus instructing
-the platform that the buildpack failed (and so did the build).
-
-Calls [`cmn::trap::teardown`](#cmntrapteardown).
+Outputs an error message (if given) and immediately exits with the specified
+return code (if given, defaults to `1`) , which instructs the platform that the
+buildpack failed (and so did the build).
 
 > [!TIP]
 > Use this function as the last instruction of the buildpack, when it failed.
+
+<details>
+<summary>Examples</summary>
+
+```bash
+# Calling:
+cmn::main::fail 2 "This is an error message."
+
+# Would output (to `stderr`):
+ !! This is an error message'
+
+# And would exit with an exit code of `2`.
+```
+
+```bash
+# Calling:
+cmn::main::fail 2
+
+# Would output nothing
+# And would immediately exit the script with an exit code of `2`.
+```
+
+```bash
+# Calling:
+cmn::main::fail
+
+# Would output nothing
+# and would immediately exit the script with an exit code of `1`.
+```
+</details>
+
+#### **`cmn::output::traceback`**
+
+Outputs a traceback on `stderr`.
+
+<details>
+<summary>Examples</summary>
+
+```bash
+# Calling:
+cmn::output::traceback
+
+# Would output (to `stderr`):
+ !!  Traceback:
+ !!    bin/compile: some_func: 12
+ !!    bin/compile: main: 89
+```
+</details>
 
 #### **`cmn::step::start`**
 
@@ -260,20 +291,6 @@ group of *tasks* that are logically bound.
 
 > [!TIP]
 > Use this function when the step is about to start.
-
-#### **`cmn::step::finish`**
-
-Outputs a success message marking the end of a buildpack step.
-
-> [!TIP]
-> Use this function when the step succeeded.
-
-#### **`cmn::step::fail`**
-
-Outputs an error message marking the end of a buildpack step.
-
-> [!TIP]
-> Use this function when the step failed.
 
 #### **`cmn::task::start`**
 
@@ -297,17 +314,19 @@ Outputs an error message marking the end of a task.
 Calls [`cmn::ouput::err`](#cmnoutputerr) with `$1` when `$1` is set.
 
 > [!TIP]
-> Use this function when the task failed.
+> Use this function when a task failed, if the situation is recoverable. When
+  it's not, please use [`cmn::main::fail`](#cmnmainfail).
 
 * * *
 
 ### File Functions
 
-#### **`cmn::file::check_checksum`**
+#### **`cmn::file::validate_checksum`**
 
 Computes the checksum of a file and checks that it matches the one stored in
 the reference file.\
-`md5`, `sha1` and `sha256` hashing algorithm are currently supported.
+`md5`, `sha1`, `sha256`, and `sha512` hashing algorithms are currently
+supported.
 
 <details>
 <summary>Example</summary>
@@ -318,15 +337,15 @@ reference="file.tar.gz.md5"
 
 cmn::task::start "Checking ${file} checksum"
 
-if ! cmn::file::check_checksum "${file}" "${reference}"; then
-    cmn::task::fail
-    cmn::output::err <<- EOM
-        Checksums do not match!"
-        '${file}' has been deleted, since it's most likely corrupt.
-        Now aborting.
-    EOM
-    exit 2
-fi
+cmn::file::validate_checksum "${file}" "${reference}" \
+    || {
+        rm -f "${file}"
+        cmn::main::fail "${?}" <<- EOM
+            Checksums do not match!
+            '${file}' has been deleted, since it's most likely corrupt.
+            Aborting.
+            EOM
+    }
 
 cmn::task::finish
 ```
@@ -340,15 +359,16 @@ Downloads the file pointed by the given URL and stores it at the given path.
 <summary>Example</summary>
 
 ```bash
-file="https://example.org/file.tar.gz"
+file_url="https://example.org/file.tar.gz"
 output="${CACHE_DIR}/file.tar.gz"
 
 cmn::task::start "Downloading file.tar.gz"
 
-if ! cmn::file::download "${file}" "${output}"; then
-    cmn::task::fail "Unable to download file.tar.gz, aborting."
-    exit
-fi
+cmn::file::download "${file_url}" "${output}" \
+    || cmn::main::fail "${?}" <<- EOM
+        Unable to download archive from '${file_url}'.
+        Aborting.
+        EOM
 
 cmn::task::finish
 ```
@@ -362,7 +382,7 @@ specified path.\
 Finally checks the hash of the downloaded file against the downloaded checksum.
 
 Calls [`cmn::file::download`](#cmnfiledownload)\
-Calls [`cmn::file::check_checksum`](#cmnfilecheck_checksum)\
+Calls [`cmn::file::validate_checksum`](#cmnfilevalidate_checksum)\
 Calls [`cmn::jobs::wait`](#cmnjobswait)
 
 <details>
@@ -378,18 +398,13 @@ hash_url="https://example.com/archive.tar.gz.sha256"
 file_path="${tmpdir}/archive.tar.gz"
 hash_path="${tmpdir}/archive.tar.gz.sha256"
 
-if cmn::file::download_and_check "${file_url}" "${hash_url}" \
-                                 "${file_path}" "${hash_path}"
-then
-    cmn::task::fail
-    cmn::output::err <<- EOM
+cmn::file::download_and_check "${file_url}" "${hash_url}" \
+    "${file_path}" "${hash_path}" \
+    || cmn::main::fail "${?}" <<- EOM
         Could not safely download archive ${archive_version}!
-    EOM
+        EOM
 
-    exit 2
-fi
-
-cmn::cache::put "${file_path}" "${CACHE_DIR}/archive-${archive_version}.tar.gz"
+cmn::task::finish
 ```
 </details>
 
@@ -489,14 +504,13 @@ bp_url="https://github.com/Scalingo/apt-buildpack.git"
 bp_output=""
 
 if ! bp_output="$( cmn::bp::run "${bp_url}" \
-        "${build_dir}" "${cache_dir}" "${env_dir}" )"; then
-    cmn::task::fail
-    cmn::output::err <<- EOM
+        "${build_dir}" "${cache_dir}" "${env_dir}" )"
+then
+    cmn::main::fail 2 <<- EOM
         Failed to run apt-buildpack.
         Output:
         ${bp_output}
-    EOM
-    exit 2
+        EOM
 fi
 ```
 </details>

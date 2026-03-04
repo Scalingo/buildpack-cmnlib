@@ -200,7 +200,6 @@ cmn::main::start() {
 # Configures Bash options, populates a few global variables and marks the
 # beginning of the buildpack.
 #
-# Calls `cmn::trap::setup`.
 # Use this function at the beginning of the buildpack.
 #
 
@@ -262,8 +261,6 @@ cmn::main::fail() {
 #
 # Use this function to end the buildpack, when it encountered an unrecoverable
 # failure.
-#
-# Calls `cmn::output::err`
 #
 
 	local -r code="${1:-1}"
@@ -442,7 +439,7 @@ cmn::jobs::wait() {
 # Waits for all child jobs running in background to finish.
 # Returns the number of failed jobs (zero means they all succeeded)
 #
-# We use `jobs -p` to get the list of child jobs running in background.
+# We use `jobs -pr` to get the list of child jobs running in background.
 # There might a very small risk of trying to wait for a process that would be
 # already done when calling `wait` and another one taking the same pid.
 # In this case, `wait` should fail, so it shouldn't be an issue.
