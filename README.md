@@ -106,7 +106,7 @@ environment variable is set (to any value).
 # Calling:
 cmn::output::err "This is an error."
 
-# Would output:
+# Would output to stderr:
  !!  This is an error.
 ```
 
@@ -117,7 +117,7 @@ cmn::output::err <<- EOM
     That should be useful to understand what's going on.
     EOM
 
-# Would output:
+# Would output to stderr:
  !!  This is an error message.
  !!  That should be useful to understand what's going on.
 ```
@@ -127,7 +127,7 @@ cmn::output::err <<- EOM
 export _CMN_DEBUG_=yes
 cmn::output::err "This is another error."
 
-# Would output:
+# Would output to stderr:
  !!  This is another error.
 
  !!  Traceback:
@@ -189,7 +189,7 @@ Outputs a traceback on `stderr`.
 # Calling:
 cmn::output::traceback
 
-# Would output (to `stderr`):
+# Would output to stderr:
  !!  Traceback:
  !!    bin/compile: some_func: 12
  !!    bin/compile: main: 89
@@ -205,7 +205,7 @@ cmn::output::traceback
 Configures Bash options, populates a few global variables and marks the
 begining of the buildpack.\
 Sets `errexit`, `errtrace`, and `pipefail`.
-Setup traps for `EXIT`, `ERR`, `HUP`, `INT`, `QUIT`, `ABRT`, and `TERM`.
+Setup traps for `EXIT`, `ERR`, `HUP`, `INT`, `QUIT`, `ABRT`, and `TERM`. \
 Populates the following global variables:
 - `build_dir`: Absolute path to the build directory
 - `cache_dir`: Absolute path to the cache directory
@@ -243,10 +243,10 @@ buildpack failed (and so did the build).
 # Calling:
 cmn::main::fail 2 "This is an error message."
 
-# Would output (to `stderr`):
- !! This is an error message'
+# Would output to stderr:
+ !! This is an error message
 
-# And would exit with an exit code of `2`.
+# And would exit with an exit code of 2.
 ```
 
 ```bash
@@ -254,7 +254,7 @@ cmn::main::fail 2 "This is an error message."
 cmn::main::fail 2
 
 # Would output nothing
-# And would immediately exit the script with an exit code of `2`.
+# And would immediately exit the script with an exit code of 2.
 ```
 
 ```bash
@@ -262,7 +262,7 @@ cmn::main::fail 2
 cmn::main::fail
 
 # Would output nothing
-# and would immediately exit the script with an exit code of `1`.
+# and would immediately exit the script with an exit code of 1.
 ```
 </details>
 
@@ -277,7 +277,7 @@ Outputs a traceback on `stderr`.
 # Calling:
 cmn::output::traceback
 
-# Would output (to `stderr`):
+# Would output to stderr:
  !!  Traceback:
  !!    bin/compile: some_func: 12
  !!    bin/compile: main: 89
