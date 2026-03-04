@@ -12,6 +12,9 @@ _cmn__read_lines() {
 		printf '%s\n' "$@"
 	elif [[ ! -t 0 ]]; then
 		# stdin is not a terminal, we can safely call `cat` without arguments.
+		# Removing this conditional will make `cat` wait for an input on stdin,
+		# which will never happend, hence causing the script to hang forever.
+		#
 		# This redirects stdin to stdout.
 		cat
 	fi
@@ -54,7 +57,7 @@ _cmn__main_err() {
 
 	cmn::task::fail
 
-    cmn::output::err <<-EOM
+	cmn::output::err <<-EOM
 	Caught Error:
 	  Command: ${cmd}
 	     Exit: ${code}
@@ -509,29 +512,34 @@ cmn::env::read() {
 }
 
 cmn::env::list() {
+
 	local -r env_dir="${1}"
+	local -a blocklist=( PATH GIT_DIR CPATH CPPATH )
+	blocklist+=( LD_PRELOAD LIBRARY_PATH LD_LIBRARY_PATH )
+	blocklist+=( JAVA_OPTS JAVA_TOOL_OPTIONS )
+	blocklist+=( BUILDPACK_URL BUILD_DIR )
 
-	local env_vars
-	local blocklist
-	local blocklist_regex
+	[[ -d "${env_dir}" ]] || return 0
+	
+	local -r block_re="^($( cmn::str::join '|' "${blocklist[@]}" ))$"
 
-	blocklist=( "PATH" "GIT_DIR" "CPATH" "CPPATH" )
-	blocklist+=( "LD_PRELOAD" "LIBRARY_PATH" "LD_LIBRARY_PATH" )
-	blocklist+=( "JAVA_OPTS" "JAVA_TOOL_OPTIONS" )
-	blocklist+=( "BUILDPACK_URL" "BUILD_DIR" )
+	local f
+	local name
 
-	blocklist_regex="^($( cmn::str::join "|" "${blocklist[@]}" ))$"
+	# List all content of env_dir:
+	for f in "${env_dir}"/*; do
+		# Skip item if not a file:
+		[[ -f "${f}" ]] || continue
 
-	if [[ -d "${env_dir}" ]]; then
-		# shellcheck disable=SC2010
-		env_vars="$( ls "${env_dir}" \
-						| grep \
-							--invert-match \
-							--extended-regexp \
-							"${blocklist_regex}" )"
-	fi
+		# Keep file name only
+		# For example: f="/app/env/MY_VAR" --> name="MY_VAR"
+		name="${f##*/}"
 
-	echo "${env_vars:=""}"
+		# Skip item if matching the regexp:
+		[[ "${name}" =~ ${block_re} ]] && continue
+		
+		printf '%s\n' "${name}"
+	done
 }
 
 
