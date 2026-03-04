@@ -8,10 +8,21 @@ prevent code rewriting thanks to commonly used utilities.
 
 ## Installing
 
-Place the `cmnlib.sh` file in a directory named `vendor`, at the root of the
-buildpack.
+Put the `cmnlib.sh` file in a directory named `vendor`, at the root of the
+buildpack:
 
-Place the following instruction at the very beginning of the `bin/compile` file
+```
+% tree my-buildpack
+my-buildpack
+├── bin
+│   ├── compile
+│   ├── detect
+│   └── release
+└── vendor
+    └── cmnlib.sh
+```
+
+Put the following instructions at the very beginning of the `bin/compile` file
 of the buildpack to import the library:
 
 ```bash
@@ -20,8 +31,6 @@ of the buildpack to import the library:
 
 # shellcheck disable=SC1090
 source "$( readlink -f "$( dirname "${0}" )/../vendor/cmnlib.sh" )"
-
-cmn::main::start "${0}" "${1}" "${2}" "${3}"
 ```
 
 
