@@ -557,27 +557,25 @@ cmn::bp::run() {
 	else
 		# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
 		# instead of asking for credentials
-		if ! GIT_TERMINAL_PROMPT=0 \
-			git clone --quiet --depth=1 "${buildpack_url}" "${bp_dir}" \
-				2>/dev/null
-		then
-			rc=2
-		else
-			if ! "${bp_dir}/bin/compile" \
-				"${build_dir}" "${cache_dir}" "${env_dir}"
-			then
-				rc=3
-			else
-				# Source `export` file if it exists:
-				if [[ -f "${bp_dir}/export" ]]; then
-					# shellcheck disable=SC1091
-					source "${bp_dir}/export"
-				fi
-			fi
-		fi
-	fi
+		GIT_TERMINAL_PROMPT=0 \
+		git clone --quiet --depth=1 "${buildpack_url}" "${bp_dir}" \
+			2>/dev/null \
+			|| cmn::main::fail "${?}"
 
-	rm -rf -- "${bp_dir}"
+		# Runs the buildpack:
+		"${bp_dir}/bin/compile" "${build_dir}" "${cache_dir}" "${env_dir}" \
+			|| cmn::main::fail "${?}"
+
+		# Source `export` file if it exists:
+		if [[ -f "${bp_dir}/export" ]]; then
+			# shellcheck disable=SC1091
+			source "${bp_dir}/export"
+		fi
+
+		# We really don't want this step to be blocking or causing errors:
+		[[ -n "${bp_dir:-}" && -d "${bp_dir}" ]] \
+			&& rm -rf -- "${bp_dir}" || true
+	fi
 
 	return "${rc}"
 }
