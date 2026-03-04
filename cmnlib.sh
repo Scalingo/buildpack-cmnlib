@@ -5,7 +5,7 @@ _cmn__read_lines() {
 ## Internal only
 #
 # Redirects input to stdin, line by line.
-# This allows the `cmn::ouput::` functions to support heredoc.
+# This allows the `cmn::output::` functions to support heredoc.
 #
 
 	if (($#)); then
@@ -291,6 +291,7 @@ cmn::task::start() {
 # Use this function when the task is about to start.
 #
 
+	_CMN_IN_TASK_="yes"
 	printf -- "    %s... " "$*"
 }
 
@@ -300,16 +301,22 @@ cmn::task::finish() {
 # Use this function when the task succeeded.
 #
 
-	printf -- "%s\n" "OK."
+	if [[ -n "${_CMN_IN_TASK_:-}" ]]; then
+		printf -- "%s\n" "OK."
+		unset _CMN_IN_TASK_
+	fi
 }
 
 cmn::task::fail() {
 #
 # Outputs an error message marking the end of a task.
-# Calls `cmn::ouput::err` with `$1` when `$1` is set.
+# Calls `cmn::output::err` with `$1` when `$1` is set.
 #
 
-	printf -- "%s\n" "Failed."
+	if [[ -n "${_CMN_IN_TASK_:-}" ]]; then
+		printf -- "%s\n" "Failed."
+		unset _CMN_IN_TASK_
+	fi
 
 	if [[ -n "${1}" ]]; then
 		cmn::output::err "${1}"
