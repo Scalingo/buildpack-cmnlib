@@ -92,12 +92,14 @@ _cmn__main_end() {
 	_cmn__trap_teardown
 
 	# Ensure we are back in build_dir:
-	[[ -n "${build_dir:-}" && -d "${build_dir}" ]] \
-		&& pushd "${build_dir}" > /dev/null || true
+	if [[ -n "${build_dir:-}" && -d "${build_dir}" ]]; then
+		pushd "${build_dir}" > /dev/null || true
+	fi
 
 	# Remove tmp_dir:
-	[[ -n "${tmp_dir:-}" && -d "${tmp_dir}" ]] \
-		&& rm -rf -- "${tmp_dir}" || true
+	if [[ -n "${tmp_dir:-}" && -d "${tmp_dir}" ]]; then
+		rm -rf -- "${tmp_dir}" || true
+	fi
 }
 
 _cmn__trap_setup() {
@@ -320,10 +322,13 @@ cmn::task::finish() {
 	fi
 }
 
+# shellcheck disable=SC2120
 cmn::task::fail() {
 #
 # Outputs an error message marking the end of a task.
 # Calls `cmn::output::err` with `$1` when `$1` is set.
+#
+# Since providing an arg is optional, disabled Shellcheck SC2120.
 #
 
 	if [[ -n "${_CMN_IN_TASK_:-}" ]]; then
@@ -331,7 +336,7 @@ cmn::task::fail() {
 		unset _CMN_IN_TASK_
 	fi
 
-	if [[ -n "${1}" ]]; then
+	if [[ -n "${1:-}" ]]; then
 		cmn::output::err "${1}"
 	fi
 }
@@ -586,8 +591,9 @@ cmn::bp::run() {
 		fi
 
 		# We really don't want this step to be blocking or causing errors:
-		[[ -n "${bp_dir:-}" && -d "${bp_dir}" ]] \
-			&& rm -rf -- "${bp_dir}" || true
+		if [[ -n "${bp_dir:-}" && -d "${bp_dir}" ]]; then
+			rm -rf -- "${bp_dir}" || true
+		fi
 	fi
 
 	return "${rc}"
