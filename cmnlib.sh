@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+# Conventions:
+#
+# - Functions prefixed with `_cmn__` are designed for internal use only.
+#   They shouldn't be used outside of cmnlib.
+#
+# - Functions prefixed with `cmn::` are designed for public use.
+#   They are meant to be used in buildpacks code.
+#
+# - Variables starting with `_CMN_` are for internal use only.
+#   They shouldn't be used outside of cmnlib.
+#
+
+
 _cmn__read_lines() {
 #
 ## Internal only
@@ -493,9 +506,26 @@ cmn::env::read() {
 }
 
 cmn::env::list() {
+#
+# List environment variables names from ENV_DIR.
+# A few specific ones are voluntarily ignored.
+#
 
 	local -r env_dir="${1}"
 
+	# Use an associative array to store the names of the environment variables
+	# we don't want to list from env_dir.
+	# This associative array is used as a set of forbidden values.
+	# The value (1) of each item is irrevelant, we only care about the keys.
+	# Using this data structure allows us to check if a value exists
+	# with a complexity of O(1).
+	#
+	# Same as:
+	#  blocked[PATH]=1
+	#  blocked[GIT_DIR]=1
+	#  blocked[CPATH]=1
+	#  ...
+	#
 	local -A blocked=(
 		[PATH]=1 [GIT_DIR]=1 [CPATH]=1 [CPPATH]=1
 		[LD_PRELOAD]=1 [LIBRARY_PATH]=1 [LD_LIBRARY_PATH]=1
