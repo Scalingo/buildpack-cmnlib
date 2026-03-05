@@ -124,8 +124,8 @@ test::output::debug_multiline() {
 }
 
 test::output::debug_not_enabled() {
-	# Make sure BUILDPACK_DEBUG is not set:
-	unset BUILDPACK_DEBUG
+	# Make sure _CMN_DEBUG_ is not set:
+	unset _CMN_DEBUG_
 	test::utils::capture cmn::output::debug "Debug is not enabled"
 
 	test::utils::assertSuccess
@@ -149,6 +149,96 @@ test::output::traceback() {
 	test::utils::assertStderrMatches "${expected}"
 }
 
+test::file::checksum_md5_matches() {
+	test::utils::capture \
+		cmn::file::validate_checksum \
+		"test/fixtures/dummy" "test/fixtures/dummy.md5"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::file::checksum_md5_matches_not() {
+	test::utils::capture \
+		cmn::file::validate_checksum \
+		"test/fixtures/dummy" "test/fixtures/dummy.failing.md5"
+
+	test::utils::assertFail
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::file::checksum_sha1_matches() {
+	test::utils::capture \
+		cmn::file::validate_checksum \
+		"test/fixtures/dummy" "test/fixtures/dummy.sha1"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::file::checksum_sha1_matches_not() {
+	test::utils::capture \
+		cmn::file::validate_checksum \
+		"test/fixtures/dummy" "test/fixtures/dummy.failing.sha1"
+
+	test::utils::assertFail
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::file::checksum_sha256_matches() {
+	test::utils::capture \
+		cmn::file::validate_checksum \
+		"test/fixtures/dummy" "test/fixtures/dummy.sha256"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::file::checksum_sha256_matches_not() {
+	test::utils::capture \
+		cmn::file::validate_checksum \
+		"test/fixtures/dummy" "test/fixtures/dummy.failing.sha256"
+
+	test::utils::assertFail
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::file::checksum_sha512_matches() {
+	test::utils::capture \
+		cmn::file::validate_checksum \
+		"test/fixtures/dummy" "test/fixtures/dummy.sha512"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::file::checksum_sha512_matches_not() {
+	test::utils::capture \
+		cmn::file::validate_checksum \
+		"test/fixtures/dummy" "test/fixtures/dummy.failing.sha512"
+
+	test::utils::assertFail
+	test::utils::assertStdoutMatches ""
+	test::utils::assertStderrMatches ""
+}
+
+test::str::join() {
+	local expected="one-two-three-four"
+
+	test::utils::capture \
+		cmn::str::join "-" "one" "two" "three" "four"
+
+	test::utils::assertSuccess
+	test::utils::assertStdoutMatches "${expected}"
+	test::utils::assertStderrMatches ""
+}
 
 # Add these functions to the test suite:
 
@@ -163,3 +253,14 @@ suite_addTest test::output::debug
 suite_addTest test::output::debug_multiline
 suite_addTest test::output::debug_not_enabled
 suite_addTest test::output::traceback
+
+suite_addTest test::file::checksum_md5_matches
+suite_addTest test::file::checksum_md5_matches_not
+suite_addTest test::file::checksum_sha1_matches
+suite_addTest test::file::checksum_sha1_matches_not
+suite_addTest test::file::checksum_sha256_matches
+suite_addTest test::file::checksum_sha256_matches_not
+suite_addTest test::file::checksum_sha512_matches
+suite_addTest test::file::checksum_sha512_matches_not
+
+suite_addTest test::str::join

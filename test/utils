@@ -65,6 +65,19 @@ test::utils::assertSuccess() {
 		"0" "${RETURN}"
 }
 
+test::utils::assertFail() {
+#
+# Asserts that the last command run exited with a status code not being 0.
+#
+# Globals:
+#   RETURN
+#
+
+	assertNotEquals  \
+		"Expected captured exit code to not be 0; was <${RETURN}>" \
+		"0" "${RETURN}"
+}
+
 test::utils::assertMatches() {
 
 	local needle
@@ -110,33 +123,6 @@ test::utils::command_exists () {
 #
 
 	type "${1}" > /dev/null 2>&1 ;
-}
-
-test::utils::assertFileMD5() {
-#
-# Asserts that the given file md5 checksum matches the actual one.
-#
-# Arguments:
-#   $1 > $expectedHash
-#      Expected md5 hash.
-#   $2 > $filename
-#      Path to the file for which we want to check the md5 hash.
-#
-
-	local expectedHash="${1}"
-	local filename="${2}"
-
-	if test::utils::command_exists "md5sum"; then
-		md5_cmd="md5sum ${filename}"
-		expected_md5_cmd_output="${expectedHash}  ${filename}"
-	elif test::utils::command_exists "md5"; then
-		md5_cmd="md5 ${filename}"
-		expected_md5_cmd_output="MD5 (${filename}) = ${expectedHash}"
-	else
-		fail "no suitable MD5 hashing command found on this system"
-	fi
-
-	assertEquals "${expected_md5_cmd_output}" "$( "${md5_cmd}" )"
 }
 
 test::utils::assertDirectoryExists() {

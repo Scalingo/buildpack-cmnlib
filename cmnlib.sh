@@ -1,25 +1,149 @@
 #!/usr/bin/env bash
 
+# Conventions:
+#
+# - Functions prefixed with `_cmn__` are designed for internal use only.
+#   They shouldn't be used outside of cmnlib.
+#
+# - Functions prefixed with `cmn::` are designed for public use.
+#   They are meant to be used in buildpacks code.
+#
+# - Variables starting with `_CMN_` are for internal use only.
+#   They shouldn't be used outside of cmnlib.
+#
+
+
+_cmn__read_lines() {
+#
+## Internal only
+#
+# Redirects input to stdin, line by line.
+# This allows the `cmn::output::` functions to support heredoc.
+#
+
+	if (($#)); then
+		printf '%s\n' "$@"
+	elif [[ ! -t 0 ]]; then
+		# stdin is not a terminal, we can safely call `cat` without arguments.
+		# Removing this conditional will make `cat` wait for an input on stdin,
+		# which will never happend, hence causing the script to hang forever.
+		#
+		# This redirects stdin to stdout.
+		cat
+	fi
+}
+
+_cmn__output_emit() {
+#
+## Internal only
+#
+# Reads input line by line thanks to `_cmn__read_lines`
+# and outputs each line formatted on the appropriate file descriptor.
+#
+
+	local -r prefix="${1}"; shift
+	# Use 1 for stdout, 2 for stderr
+	# Defaults to stdout:
+	local -r fd="${1:-1}"
+	shift || true
+
+	while IFS= read -r line; do
+		printf '%s%s\n' "${prefix}" "${line}" >&"${fd}"
+	done < <(_cmn__read_lines "$@")
+}
+
+_cmn__main_err() {
+#
+## Internal only
+#
+# Handler for unmanaged errors.
+# Please use `cmn::main::finish` or `cmn::main::fail` instead.
+#
+
+	# We don't want to be caught in an err loop:
+	# so stop trapping ERR ASAP:
+	set +o errexit
+	trap - ERR
+
+	local -r code="${1:-1}"
+	local -r cmd="${2:-""}"
+
+	cmn::task::fail
+
+	cmn::output::err <<-EOM
+	Caught Error:
+	  Command: ${cmd}
+	     Exit: ${code}
+	EOM
+
+	cmn::output::traceback
+
+	exit "${code}"
+}
+
+_cmn__main_end() {
+#
+## Internal only
+#
+# Handler for EXIT signal.
+# Please use `cmn::main::finish` or `cmn::main::fail` instead.
+#
+
+	_cmn__trap_teardown
+
+	# Ensure we are back in build_dir:
+	if [[ -n "${build_dir:-}" && -d "${build_dir}" ]]; then
+		pushd "${build_dir}" > /dev/null || true
+	fi
+
+	# Remove tmp_dir:
+	if [[ -n "${tmp_dir:-}" && -d "${tmp_dir}" ]]; then
+		rm -rf -- "${tmp_dir}" || true
+	fi
+}
+
+_cmn__trap_setup() {
+#
+## Internal only
+#
+# Instructs the buildpack to catch the `SIGHUP`, `SIGINT`, `SIGQUIT`,
+# `SIGABRT`, and `SIGTERM` signals and to call `cmn::main::fail`
+# when it happens.
+# Also instructs the buildpack to catch `EXIT` and to call `_cmn__main_end`
+# when it happens.
+#
+
+	trap '_cmn__main_err $? "$BASH_COMMAND"' ERR
+	trap '_cmn__main_err 129 "SIGHUP"'  HUP
+	trap '_cmn__main_err 130 "SIGINT"'  INT
+	trap '_cmn__main_err 131 "SIGQUIT"' QUIT
+	trap '_cmn__main_err 134 "SIGABRT"' ABRT
+	trap '_cmn__main_err 143 "SIGTERM"' TERM
+
+	trap "_cmn__main_end" EXIT
+}
+
+_cmn__trap_teardown() {
+#
+## Internal only
+#
+# Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
+# `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
+#
+
+	trap - EXIT ERR HUP INT QUIT ABRT TERM
+}
+
+
+
 cmn::output::info() {
 #
 # Outputs an informational message on stdout.
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	while IFS= read -r line; do
-		# Apply formatting:
-		printf "    %b\n" "${line}"
-	done < <(
-		if [[ ${#} -gt 0 ]]; then
-			# When we have multiple arguments,
-			# send them one by one to the `while` loop.
-			printf "%b\n" "${@}"
-		else
-			# Calling `cat` without arguments redirects stdin to stdout
-			# This allows to support heredoc.
-			cat
-		fi
-	)
+	local -r prefix="    "
+	_cmn__output_emit "${prefix}" 1 "${@}"
 }
 
 cmn::output::warn() {
@@ -28,15 +152,8 @@ cmn::output::warn() {
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	while IFS= read -r line; do
-		printf " !  %b\n" "${line}"
-	done < <(
-		if [[ ${#} -gt 0 ]]; then
-			printf "%b\n" "${@}"
-		else
-			cat
-		fi
-	)
+	local -r prefix=" !  "
+	_cmn__output_emit "${prefix}" 1 "${@}"
 }
 
 cmn::output::err() {
@@ -45,22 +162,15 @@ cmn::output::err() {
 # Can be called with a string argument or with a Bash heredoc.
 #
 
-	while IFS= read -r line; do
-		printf " !! %b\n" "${line}" >&2
-	done < <(
-		if [[ ${#} -gt 0 ]]; then
-			printf "%b\n" "${@}"
-		else
-			cat
-		fi
-	)
+	local -r prefix=" !! "
+	_cmn__output_emit "${prefix}" 2 "${@}"
 
-	if [[ -n "${_CMN_DEBUG_}" ]]; then
+	if [ -n "${_CMN_DEBUG_:-}" ]; then
 		cmn::output::traceback
 	fi
 }
 
-# shellcheck disable=2120
+# shellcheck disable=SC2120
 cmn::output::debug() {
 #
 # Outputs a debug message on stdout.
@@ -70,23 +180,18 @@ cmn::output::debug() {
 # Setting _CMN_DEBUG_ should be reserved for cmnlib itself,
 # or when debugging buildpacks.
 #
+# Since providing args is optional, disable SC2120.
 
 	# Return ASAP if _CMN_DEBUG_ isn't set
-	[[ -z "${_CMN_DEBUG_}" ]] && return
+	[[ -z "${_CMN_DEBUG_:-}" ]] && return
 
 	while IFS= read -r line; do
-		printf " *  %s: %s: %s: %b\n" \
+		printf " *  %s: %s: %s: %s\n" \
 			"${BASH_SOURCE[1]}" \
 			"${FUNCNAME[1]}" \
 			"${BASH_LINENO[0]}" \
 			"${line}"
-	done < <(
-		if [[ ${#} -gt 0 ]]; then
-			printf "%b\n" "${@}"
-		else
-			cat
-		fi
-	)
+	done < <( _cmn__read_lines "${@}" )
 }
 
 cmn::output::traceback() {
@@ -97,32 +202,11 @@ cmn::output::traceback() {
 	printf " !! Traceback:\n" >&2
 
 	for (( i=1; i<${#FUNCNAME[@]}; i++ )); do
-		>&2 printf " !! %s: %s: %s\n" \
+		>&2 printf " !!   %s: %s: %s\n" \
 			"${BASH_SOURCE[i]}" \
 			"${FUNCNAME[$i]}" \
 			"${BASH_LINENO[$i-1]}"
 	done
-}
-
-
-
-cmn::trap::setup() {
-#
-# Instructs the buildpack to catch the `EXIT`, `SIGHUP`, `SIGINT`,
-# `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals and to call `cmn::main::fail`
-# when it happens.
-#
-
-	trap cmn::main::fail EXIT SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
-}
-
-cmn::trap::teardown() {
-#
-# Instructs the buildpack to stop catching the `EXIT`, `SIGHUP`, `SIGINT`,
-# `SIGQUIT`, `SIGABRT`, and `SIGTERM` signals.
-#
-
-	trap - EXIT SIGHUP SIGINT SIGQUIT SIGABRT SIGTERM
 }
 
 
@@ -132,14 +216,12 @@ cmn::main::start() {
 # Configures Bash options, populates a few global variables and marks the
 # beginning of the buildpack.
 #
-# Calls `cmn::trap::setup`.
 # Use this function at the beginning of the buildpack.
 #
 
-	set -o errexit
-	set -o pipefail
+	set -o errexit -o errtrace -o pipefail
 
-	if [ -n "${BUILDPACK_DEBUG}" ]; then
+	if [[ -n "${BUILDPACK_DEBUG:-}" ]]; then
 		set -o xtrace
 	fi
 
@@ -151,6 +233,13 @@ cmn::main::start() {
 	buildpack_dir="$( readlink -f "${base_dir}/.." )"
 	tmp_dir="$( mktemp --directory --tmpdir="/tmp" --quiet "bp-XXXXXX" )"
 
+	readonly build_dir
+	readonly cache_dir
+	readonly env_dir
+	readonly base_dir
+	readonly buildpack_dir
+	readonly tmp_dir
+
 	cmn::output::debug <<-EOM
 		build_dir:     ${build_dir}
 		cache_dir:     ${cache_dir}
@@ -161,59 +250,43 @@ cmn::main::start() {
 
 	pushd "${build_dir}" > /dev/null
 
-	cmn::trap::setup
-}
-
-cmn::main::end() {
-#
-# /!\ Not to be called directly /!\
-#
-# Please use `cmn::main::finish` or `cmn::main::fail` instead.
-# Calls `cmn::trap::teardown`.
-#
-
-	cmn::trap::teardown
-
-	pushd "${build_dir}" > /dev/null
-
-	unset build_dir
-	unset cache_dir
-	unset env_dir
-	unset base_dir
-	unset buildpack_dir
-	unset tmp_dir
+	_cmn__trap_setup
 }
 
 cmn::main::finish() {
 #
 # Outputs a success message and exits with a `0` return code, thus
 # instructing the platform that the buildpack ran successfully.
-# Calls `cmn::main::end`.
+#
 # Use this function as the last instruction of the buildpack, when it
 # succeeded.
 #
 
-	cmn::main::end
-	printf "\n%b\n" "All done."
+	printf "\n%s\n" "All done."
 	exit 0
 }
 
+
 cmn::main::fail() {
 #
-# Outputs an error message and exits with a `1` return code, thus
+# Outputs an error message if given and exits with the given return code, thus
 # instructing the platform that the buildpack failed (and so did the
 # build).
-# Calls `cmn::main::end`.
-# Use this function as the last instruction of the buildpack, when it
-# failed.
+#
+# When no return code is given, defaults to 1.
+#
+# Use this function to end the buildpack, when it encountered an unrecoverable
+# failure.
 #
 
-	cmn::main::end
-	printf "\n%b\n" "Failed." >&2
-	exit 1
+	local -r code="${1:-1}"
+	shift
+
+	cmn::task::fail
+	cmn::output::err "${@}"
+
+	exit "${code}"
 }
-
-
 
 cmn::step::start() {
 #
@@ -222,25 +295,7 @@ cmn::step::start() {
 # Use this function when the step is about to start.
 #
 
-	printf "---> %b\n" "${*}"
-}
-
-cmn::step::finish() {
-#
-# Outputs a success message marking the end of a buildpack step.
-# Use this function when the step succeeded.
-#
-
-	printf "    %b\n" "Done."
-}
-
-cmn::step::fail() {
-#
-# Outputs an error message marking the end of a buildpack step.
-# Use this function when the step failed.
-#
-
-	printf "    %b\n" "Failed."
+	printf -- "--> %s\n" "${*}"
 }
 
 
@@ -252,7 +307,8 @@ cmn::task::start() {
 # Use this function when the task is about to start.
 #
 
-	echo -n "    $*... "
+	_CMN_IN_TASK_="yes"
+	printf -- "    %s... " "$*"
 }
 
 cmn::task::finish() {
@@ -261,29 +317,38 @@ cmn::task::finish() {
 # Use this function when the task succeeded.
 #
 
-	echo "OK."
+	if [[ -n "${_CMN_IN_TASK_:-}" ]]; then
+		printf -- "%s\n" "OK."
+		unset _CMN_IN_TASK_
+	fi
 }
 
+# shellcheck disable=SC2120
 cmn::task::fail() {
 #
 # Outputs an error message marking the end of a task.
-# Calls `cmn::ouput::err` with `$1` when `$1` is set.
+# Calls `cmn::output::err` with `$1` when `$1` is set.
+#
+# Since providing args is optional, disable SC2120.
 #
 
-	echo "Failed."
+	if [[ -n "${_CMN_IN_TASK_:-}" ]]; then
+		printf -- "%s\n" "Failed."
+		unset _CMN_IN_TASK_
+	fi
 
-	if [[ -n "${1}" ]]; then
+	if [[ -n "${1:-}" ]]; then
 		cmn::output::err "${1}"
 	fi
 }
 
 
 
-cmn::file::check_checksum() {
+cmn::file::validate_checksum() {
 #
 # Computes the checksum of a file and checks that it matches the one stored in
 # the reference file.
-# md5, sha1 and sha256 hashing algorithm are currently supported.
+# md5, sha1, sha256, and sha512 hashing algorithm are currently supported.
 #
 # $1: file
 # $2: checksum file
@@ -293,7 +358,11 @@ cmn::file::check_checksum() {
 	local -r hash_file="${2}"
 
 	local -r hash_algo="${hash_file##*.}"
-	local -r ref_hash="$( cut -d " " -f 1 < "${hash_file}" )"
+	local ref_hash
+
+	if ! read -r ref_hash _ < "${hash_file}"; then
+		return 2
+	fi
 
 	local rc=1
 
@@ -314,20 +383,20 @@ cmn::file::check_checksum() {
 			;;
 
 		"md5")
-		    md5sum --check --status <<< "${ref_hash}  ${file}"
+			md5sum --check --status <<< "${ref_hash}  ${file}"
 			rc="${?}"
 			;;
 
 		*)
-			rc=2
+			rc=3
 			;;
 	esac
 
 	cmn::output::debug <<-EOM
-		file:      ${build_dir}
-		hash_file: ${cache_dir}
-		hash_algo: ${env_dir}
-		ref_hash:  ${buildpack_dir}
+		file:      ${file}
+		hash_file: ${hash_file}
+		hash_algo: ${hash_algo}
+		ref_hash:  ${ref_hash}
 		result:    ${rc}
 	EOM
 
@@ -349,7 +418,11 @@ cmn::file::download() {
 		Downloading "${url}" and saving to "${out}".
 	EOM
 
-	curl --silent --fail --retry 3 --location "${url}" --output "${out}"
+	curl --silent --fail --location \
+		--retry 3 --retry-delay 10 --retry-connrefused \
+		--connect-timeout 10 --max-time 300 \
+		--output "${out}" \
+		"${url}"
 
 	return "${?}"
 }
@@ -361,10 +434,6 @@ cmn::file::download_and_check() {
 # specified path.
 # Finally checks the hash of the downloaded file against the downloaded
 # checksum.
-#
-# Calls `cmn::file::download`
-# Calls `cmn::file::check_checksum`
-# Calls `cmn::jobs::wait`
 #
 # $1: file URL
 # $2: checksum URL
@@ -383,7 +452,7 @@ cmn::file::download_and_check() {
 	cmn::file::download "${hash_url}" "${hash_path}" &
 
 	if cmn::jobs::wait; then
-		cmn::file::check_checksum "${file_path}" "${hash_path}"
+		cmn::file::validate_checksum "${file_path}" "${hash_path}"
 		rc="${?}"
 	fi
 
@@ -396,35 +465,25 @@ cmn::jobs::wait() {
 # Waits for all child jobs running in background to finish.
 # Returns the number of failed jobs (zero means they all succeeded)
 #
-# We use `jobs -p` to get the list of child jobs running in background.
+# We use `jobs -pr` to get the list of child jobs running in background.
 # There might a very small risk of trying to wait for a process that would be
 # already done when calling `wait` and another one taking the same pid.
 # In this case, `wait` should fail, so it shouldn't be an issue.
 #
 
 	local rc=0
+	local pid
 
 	while read -r pid; do
-    	if ! wait "${pid}"; then
+		# If $pid is empty, skip to next loop item:
+		[[ -z "${pid}" ]] && continue
+
+		if ! wait "${pid}"; then
 			(( rc+=1 ))
 		fi
-	done <<< "$( jobs -p )"
+	done < <( jobs -pr )
 
 	return "${rc}"
-}
-
-
-
-cmn::str::join() {
-	local -r separator="${1}"
-
-	local res
-
-	res="$( printf "${separator}%s" "${@}" )"
-	# Remove leading separator:
-	res="${res:${#separator}}"
-
-	echo "${res}"
 }
 
 
@@ -437,44 +496,66 @@ cmn::env::read() {
 # Only configuration variables which names pass the positive pattern and don't
 # match the negative pattern are exported.
 #
-# Calls `cmn::env::list`
-#
 
 	local -r env_dir="${1}"
-	local -r env_vars="$( cmn::env::list "${env_dir}" )"
+	local e
+	local value
 
-	while read -r e; do
-		local value
-		value="$( cat "${env_dir}/${e}" )"
-
+	while IFS= read -r e; do
+		# Read env var value from file:
+		value="$( <"${env_dir}/${e}" )"
+		# Remove potential ending new line:
+		value="${value%$'\n'}"
+		# Export the env var:
 		export "${e}=${value}"
-	done <<< "${env_vars}"
+	done < <(cmn::env::list "${env_dir}")
 }
 
 cmn::env::list() {
+#
+# List environment variables names from ENV_DIR.
+# A few specific ones are voluntarily ignored.
+#
+
 	local -r env_dir="${1}"
 
-	local env_vars
-	local blocklist
-	local blocklist_regex
+	# Use an associative array to store the names of the environment variables
+	# we don't want to list from env_dir.
+	# This associative array is used as a set of forbidden values.
+	# The value (1) of each item is irrevelant, we only care about the keys.
+	# Using this data structure allows us to check if a value exists
+	# with a complexity of O(1).
+	#
+	# Same as:
+	#  blocked[PATH]=1
+	#  blocked[GIT_DIR]=1
+	#  blocked[CPATH]=1
+	#  ...
+	#
+	local -A blocked=(
+		[PATH]=1 [GIT_DIR]=1 [CPATH]=1 [CPPATH]=1
+		[LD_PRELOAD]=1 [LIBRARY_PATH]=1 [LD_LIBRARY_PATH]=1
+		[JAVA_OPTS]=1 [JAVA_TOOL_OPTIONS]=1
+		[BUILDPACK_URL]=1 [BUILD_DIR]=1
+	)
 
-	blocklist=( "PATH" "GIT_DIR" "CPATH" "CPPATH" )
-	blocklist+=( "LD_PRELOAD" "LIBRARY_PATH" "LD_LIBRARY_PATH" )
-	blocklist+=( "JAVA_OPTS" "JAVA_TOOL_OPTIONS" )
-	blocklist+=( "BUILDPACK_URL" "BUILD_DIR" )
+	local f
+	local name
 
-	blocklist_regex="^($( cmn::str::join "|" "${blocklist[@]}" ))$"
+	# List all content of env_dir:
+	for f in "${env_dir}"/*; do
+		# Skip item if not a file:
+		[[ -f "${f}" ]] || continue
 
-	if [[ -d "${env_dir}" ]]; then
-		# shellcheck disable=SC2010
-		env_vars="$( ls "${env_dir}" \
-						| grep \
-							--invert-match \
-							--extended-regexp \
-							"${blocklist_regex}" )"
-	fi
+		# Keep file name only
+		# For example: f="/app/env/MY_VAR" --> name="MY_VAR"
+		name="${f##*/}"
 
-	echo "${env_vars:=""}"
+		# Skip if in blocked:
+		[[ -n "${blocked[${name}]:-}" ]] && continue
+
+		printf '%s\n' "${name}"
+	done
 }
 
 
@@ -485,33 +566,34 @@ cmn::bp::run() {
 	local -r cache_dir="${3}"
 	local -r env_dir="${4}"
 
-	local rc=1
+	local rc=0
 	local bp_dir
 
 	if ! bp_dir="$( mktemp --directory --tmpdir="/tmp" \
-						--quiet "sub_bp-XXXXXX" )"; then
-		return "${rc}"
-	fi
-
-	# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
-	# instead of asking for credentials
-	if ! GIT_TERMINAL_PROMPT=0 \
-			git clone --quiet --depth=1 "${buildpack_url}" "${bp_dir}" \
-				2>/dev/null
+			--quiet "sub_bp-XXXXXX" )"
 	then
-		rc=2
+		rc=1
 	else
-		if ! "${bp_dir}/bin/compile" "${build_dir}" "${cache_dir}" "${env_dir}"
-		then
-			rc="${?}"
-		else
-			# Source `export` file if it exists:
-			if [[ -f "${bp_dir}/export" ]]; then
-				# shellcheck disable=SC1091
-				source "${bp_dir}/export"
-			fi
+		# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
+		# instead of asking for credentials
+		GIT_TERMINAL_PROMPT=0 \
+		git clone --quiet --depth=1 "${buildpack_url}" "${bp_dir}" \
+			2>/dev/null \
+			|| cmn::main::fail "${?}"
 
-			rc=0
+		# Runs the buildpack:
+		"${bp_dir}/bin/compile" "${build_dir}" "${cache_dir}" "${env_dir}" \
+			|| cmn::main::fail "${?}"
+
+		# Source `export` file if it exists:
+		if [[ -f "${bp_dir}/export" ]]; then
+			# shellcheck disable=SC1091
+			source "${bp_dir}/export"
+		fi
+
+		# We really don't want this step to be blocking or causing errors:
+		if [[ -n "${bp_dir:-}" && -d "${bp_dir}" ]]; then
+			rm -rf -- "${bp_dir}" || true
 		fi
 	fi
 
@@ -523,31 +605,31 @@ cmn::bp::run() {
 readonly -f cmn::output::info
 readonly -f cmn::output::warn
 readonly -f cmn::output::err
+readonly -f cmn::output::debug
 readonly -f cmn::output::traceback
 
-readonly -f cmn::trap::setup
-readonly -f cmn::trap::teardown
-
 readonly -f cmn::main::start
-readonly -f cmn::main::end
 readonly -f cmn::main::finish
 readonly -f cmn::main::fail
 
 readonly -f cmn::step::start
-readonly -f cmn::step::finish
-readonly -f cmn::step::fail
 
 readonly -f cmn::task::start
 readonly -f cmn::task::finish
 readonly -f cmn::task::fail
 
-readonly -f cmn::file::check_checksum
+readonly -f cmn::file::validate_checksum
 readonly -f cmn::file::download
 readonly -f cmn::file::download_and_check
-
-readonly -f cmn::str::join
 
 readonly -f cmn::env::read
 readonly -f cmn::env::list
 
 readonly -f cmn::bp::run
+
+readonly -f _cmn__read_lines
+readonly -f _cmn__output_emit
+readonly -f _cmn__main_err
+readonly -f _cmn__main_end
+readonly -f _cmn__trap_setup
+readonly -f _cmn__trap_teardown
