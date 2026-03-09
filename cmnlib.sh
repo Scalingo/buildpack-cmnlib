@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-
+#
+# Please see https://github.com/Scalingo/buildpack-cmnlib for help.
+#
 # Conventions:
 #
 # - Functions prefixed with `_cmn__` are designed for internal use only.
@@ -11,6 +13,9 @@
 # - Variables starting with `_CMN_` are for internal use only.
 #   They shouldn't be used outside of cmnlib.
 #
+
+
+_CMN_VERSION_=20260309
 
 
 _cmn__read_lines() {
@@ -96,8 +101,9 @@ _cmn__main_end() {
 		pushd "${build_dir}" > /dev/null || true
 	fi
 
-	# Remove tmp_dir:
-	if [[ -n "${tmp_dir:-}" && -d "${tmp_dir}" ]]; then
+	# Remove tmp_dir, unless _CMN_DEBUG_ is set:
+	if [[ -z "${_CMN_DEBUG_:-}" && -n "${tmp_dir:-}" && -d "${tmp_dir}" ]]
+	then
 		rm -rf -- "${tmp_dir}" || true
 	fi
 }
@@ -185,6 +191,12 @@ cmn::output::debug() {
 	# Return ASAP if _CMN_DEBUG_ isn't set
 	[[ -z "${_CMN_DEBUG_:-}" ]] && return
 
+	# Return to line if we are in a task to avoid breaking the output:
+	if [[ -n "${_CMN_IN_TASK_:-}" ]]; then
+		printf -- "\n"
+		unset _CMN_IN_TASK_
+	fi
+
 	while IFS= read -r line; do
 		printf " *  %s: %s: %s: %s\n" \
 			"${BASH_SOURCE[1]}" \
@@ -199,7 +211,7 @@ cmn::output::traceback() {
 # Outputs a traceback to stderr.
 #
 
-	printf " !! Traceback:\n" >&2
+	printf "\n !! Traceback:\n" >&2
 
 	for (( i=1; i<${#FUNCNAME[@]}; i++ )); do
 		>&2 printf " !!   %s: %s: %s\n" \
@@ -231,7 +243,8 @@ cmn::main::start() {
 
 	base_dir="$( cd -P "$( dirname "${1}" )" && pwd )"
 	buildpack_dir="$( readlink -f "${base_dir}/.." )"
-	tmp_dir="$( mktemp --directory --tmpdir="/tmp" --quiet "bp-XXXXXX" )"
+	tmp_dir="$( mktemp --directory --tmpdir="/tmp" --quiet \
+				"buildpack-XXXXXX" )"
 
 	readonly build_dir
 	readonly cache_dir
@@ -415,13 +428,14 @@ cmn::file::download() {
 	local -r out="${2:-"-"}"
 
 	cmn::output::debug <<-EOM
-		Downloading "${url}" and saving to "${out}".
+		Downloading: ${url}
+		Saving to:   ${out}
 	EOM
 
 	curl --silent --fail --location \
 		--retry 3 --retry-delay 10 --retry-connrefused \
 		--connect-timeout 10 --max-time 300 \
-		--output "${out}" \
+		--create-dirs --output "${out}" \
 		"${url}"
 
 	return "${?}"
@@ -561,43 +575,133 @@ cmn::env::list() {
 
 
 cmn::bp::run() {
-	local -r buildpack_url="${1}"
-	local -r build_dir="${2}"
-	local -r cache_dir="${3}"
-	local -r env_dir="${4}"
+#
+# Downloads and runs a buildpack.
+#
+
+	local -r builddir="${1}"
+	local -r cachedir="${2}"
+	local -r envdir="${3}"
+	local -r tmpdir="${4}"
+	local -r url="${5}"
+	local -r branch="${6:-""}"
 
 	local rc=0
-	local bp_dir
+	local bpdir
+	local bpout
+	local tech=""
 
-	if ! bp_dir="$( mktemp --directory --tmpdir="/tmp" \
-			--quiet "sub_bp-XXXXXX" )"
+	if ! bpdir="$( mktemp --directory --tmpdir="${tmpdir}" \
+			--quiet "buildpack-XXXXXX" )"
 	then
-		rc=1
+		cmn::main::fail 2 <<-EOM
+			Unable to create temporary directory to store the buildpack.
+			Aborting.
+		EOM
+	fi
+
+	if [[ "${url}" =~ \.tgz$ || "${url}" =~ \.tar\.gz$ ]]; then
+
+		cmn::task::start "Downloading buildpack"
+		local archive="${bpdir}/${url##*/}"
+		cmn::file::download "${url}" "${archive}" \
+			|| cmn::main::fail "${?}" <<-EOM
+				Unable to download the buildpack from ${url}.
+				Common errors include but are not limited to:
+				- Temporary network issue.
+				- Typo in the provided ULR.
+				- Using a URL that requires authentication.
+			EOM
+		cmn::task::finish
+
+		cmn::task::start "Extracting buildpack code"
+		tar --extract --gzip --directory "${bpdir}" --file "${archive}" \
+			--strip-components 1 >/dev/null 2>&1
+		cmn::task::finish
 	else
+		cmn::task::start "Cloning buildpack"
+
 		# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
 		# instead of asking for credentials
 		GIT_TERMINAL_PROMPT=0 \
-		git clone --quiet --depth=1 "${buildpack_url}" "${bp_dir}" \
-			2>/dev/null \
-			|| cmn::main::fail "${?}"
+		git clone --quiet --depth=1 "${url}" "${bpdir}" 2>/dev/null \
+			|| cmn::main::fail "${?}" <<-EOM
+				Unable to clone the buildpack from ${url}.
+				Common errors include but are not limited to:
+				- Temporary network issue.
+				- Typo in the Git ULR.
+				- Using a private repository.
+			EOM
+		cmn::task::finish
 
-		# Runs the buildpack:
-		"${bp_dir}/bin/compile" "${build_dir}" "${cache_dir}" "${env_dir}" \
-			|| cmn::main::fail "${?}"
-
-		# Source `export` file if it exists:
-		if [[ -f "${bp_dir}/export" ]]; then
-			# shellcheck disable=SC1091
-			source "${bp_dir}/export"
+		if [[ -f "${bpdir}/.gitmodules" ]]; then
+			cmn::task::start "Initializing submodule"
+			pushd "${bpdir}" > /dev/null
+			git submodule update --init --recursive 2>/dev/null
+			popd > /dev/null
+			cmn::task::finish
 		fi
 
-		# We really don't want this step to be blocking or causing errors:
-		if [[ -n "${bp_dir:-}" && -d "${bp_dir}" ]]; then
-			rm -rf -- "${bp_dir}" || true
+		if [[ -n "${branch}" ]]; then
+			cmn::task::start "Switching to branch ${branch}"
+			pushd "${bpdir}" > /dev/null
+			git checkout --quiet "${branch}"
+			popd > /dev/null
+			cmn::task::finish
 		fi
 	fi
 
-	return "${rc}"
+	pushd "${bpdir}" > /dev/null
+
+	# Ensure bin/detect and bin/compile are executable:
+	chmod --silent +x "${bpdir}/bin/"{detect,compile}
+
+	cmn::task::start "Detecting technology"
+	if ! tech="$( "${bpdir}/bin/detect" "${builddir}" )"; then
+		cmn::main::fail 2 <<-EOM
+			Application is not compatible with the buildpack.
+			Please see our documentation about buildpacks for more information.
+			You can also reach out to our Support Team.
+			https://doc.scalingo.com/platform/deployment/buildpacks/intro
+		EOM
+	fi
+	cmn::task::finish
+
+	cmn::output::info "Detected technology: ${tech}"
+
+	cmn::task::start "Compiling"
+	if ! bpout="$( "${bpdir}/bin/compile" \
+		"${builddir}" "${envdir}" "${cachedir}" 2>&1 )"
+	then
+		cmn::main::fail 2 <<-EOM
+			An error occured while running the buildpack.
+			Here is the output:
+			${bpout}
+		EOM
+	fi
+	cmn::task::finish
+
+	# Source potential left-behind export script.
+	# This allows to leave a clean environment for the next buildpack.
+	if [[ -e "${bpdir}/export" ]]; then
+		cmn::task::start "Sourcing export script for next buildpack"
+		source "${bpdir}/export"
+		cmn::task::finish
+	fi
+
+	if [[ -x "${bpdir}/bin/release" ]]; then
+		"${bpdir}/bin/release" "${builddir}" \
+			> "${builddir}/last_pack_release.out"
+	fi
+
+	popd > /dev/null
+
+	# We really don't want this step to be blocking or causing errors:
+	if [[ -z "${_CMN_DEBUG_:-}" && -n "${bpdir:-}" && -d "${bpdir}" ]]; then
+		rm -rf -- "${bpdir}" || true
+	fi
+
+	return 0
 }
 
 
