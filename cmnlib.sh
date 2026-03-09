@@ -685,6 +685,7 @@ cmn::bp::run() {
 	# This allows to leave a clean environment for the next buildpack.
 	if [[ -e "${bpdir}/export" ]]; then
 		cmn::task::start "Sourcing export script for next buildpack"
+		# shellcheck disable=SC1091
 		source "${bpdir}/export"
 		cmn::task::finish
 	fi
