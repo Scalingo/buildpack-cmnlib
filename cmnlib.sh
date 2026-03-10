@@ -629,7 +629,7 @@ cmn::bp::run() {
 				Unable to clone the buildpack from ${url}.
 				Common errors include but are not limited to:
 				- Temporary network issue.
-				- Typo in the Git ULR.
+				- Typo in the Git URL.
 				- Using a private repository.
 			EOM
 		cmn::task::finish
