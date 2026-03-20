@@ -15,7 +15,15 @@
 #
 
 
-_CMN_VERSION_=20260309
+_CMN_VERSION_=20260320
+
+# If _CMN_LOADED_ is set, this means the library is already sourced.
+# As functions are readonly, we don't want to load it again, as this would
+# cause failures.
+# So, if _CMN_LOADED_ is set, return immediately.
+# Else, set it and load the functions.
+[[ -n "${_CMN_LOADED_}" ]] && return
+_CMN_LOADED_="yes"
 
 
 _cmn__read_lines() {
