@@ -15,7 +15,15 @@
 #
 
 
-_CMN_VERSION_=20260309
+_CMN_VERSION_=20260320
+
+# If _CMN_LOADED_ is set, this means the library is already sourced.
+# As functions are readonly, we don't want to load it again, as this would
+# cause failures.
+# So, if _CMN_LOADED_ is set, return immediately.
+# Else, set it and load the functions.
+[[ -n "${_CMN_LOADED_}" ]] && return
+_CMN_LOADED_="yes"
 
 
 _cmn__read_lines() {
@@ -373,9 +381,16 @@ cmn::file::validate_checksum() {
 	local -r hash_algo="${hash_file##*.}"
 	local ref_hash
 
-	if ! read -r ref_hash _ < "${hash_file}"; then
-		return 2
-	fi
+	# Reads the whole first line of hash_file
+	# Ensure this command never provokes an exit.
+	# (`read` returns 1 when the file misses a newline at EOF)
+	IFS= read -r line < "${hash_file}" || true
+
+	# Trim starting whitespaces:
+	line=${line#"${line%%[![:space:]]*}"}
+
+	# Retrieves the string before the first whitespace:
+	ref_hash=${line%%[[:space:]]*}
 
 	local rc=1
 
@@ -671,7 +686,7 @@ cmn::bp::run() {
 
 	cmn::task::start "Compiling"
 	if ! bpout="$( "${bpdir}/bin/compile" \
-		"${builddir}" "${envdir}" "${cachedir}" 2>&1 )"
+		"${builddir}" "${cachedir}" "${envdir}" 2>&1 )"
 	then
 		cmn::main::fail 2 <<-EOM
 			An error occured while running the buildpack.
