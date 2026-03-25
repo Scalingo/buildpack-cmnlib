@@ -1,0 +1,7 @@
+dependencies = []
+description = "A library of Bash functions to write buildpacks."
+flags = ["tools"]
+languages = ["shell"]
+owner = "francois.kubler@scalingo.com"
+team = "IST"
+version = "1.1.2"
