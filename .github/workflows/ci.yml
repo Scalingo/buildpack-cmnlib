@@ -10,6 +10,7 @@ on:
 # The list of permissions is explained on the GitHub doc:
 # https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
 permissions:
+  actions: read
   contents: read
 
 env:
@@ -18,14 +19,14 @@ env:
 jobs:
   shellcheck:
     name: "ShellCheck"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Install shellcheck
         shell: bash
         run: |
-          curl --silent --location https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz \
-            | tar --extract --xz --file - --directory=/tmp
+          curl --silent --location --output=shellcheck.tar.xz https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz
+          tar --extract --xz --file=shellcheck.tar.xz --directory /tmp
           sudo mv /tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck /usr/local/bin/
       - name: Run shellcheck
         shell: bash
