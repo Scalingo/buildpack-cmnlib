@@ -29,8 +29,7 @@ jobs:
           sudo mv /tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck /usr/local/bin/
       - name: Run shellcheck
         shell: bash
+        working-directory: "${GITHUB_WORKSPACE}"
         run: |
-          pushd "${GITHUB_WORKSPACE}"
           find . -name "*.sh" -exec shellcheck -S info -s bash {} +
-          popd
 ...
