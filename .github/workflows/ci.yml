@@ -1,0 +1,34 @@
+---
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches: [feat/shellcheck, main, master, prod]
+
+# The list of permissions is explained on the GitHub doc:
+# https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions:
+  contents: read
+
+env:
+  SHELLCHECK_VERSION: "0.11.0"
+
+jobs:
+  shellcheck:
+    name: "ShellCheck"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - shell: bash
+        run: |
+          curl --silent --location https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz \
+            | tar --extract --xz --file - --directory=/tmp
+          sudo mv /tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck /usr/local/bin/
+      - shell: bash
+        run: |
+          pushd "${GITHUB_WORKSPACE}"
+          find . -name "*.sh" -exec shellcheck -S info -s bash {} +
+          popd
+...
