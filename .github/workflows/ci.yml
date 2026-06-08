@@ -21,12 +21,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - shell: bash
+      - name: Install shellcheck
+        shell: bash
         run: |
           curl --silent --location https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz \
             | tar --extract --xz --file - --directory=/tmp
           sudo mv /tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck /usr/local/bin/
-      - shell: bash
+      - name: Run shellcheck
+        shell: bash
         run: |
           pushd "${GITHUB_WORKSPACE}"
           find . -name "*.sh" -exec shellcheck -S info -s bash {} +
