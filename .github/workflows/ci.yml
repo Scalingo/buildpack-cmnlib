@@ -25,8 +25,8 @@ jobs:
       - name: Install shellcheck
         shell: bash
         run: |
-          curl --silent --location --output=shellcheck.tar.xz https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz
-          tar --extract --xz --file=shellcheck.tar.xz --directory /tmp
+          curl --silent --location --remote-name https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz
+          tar --extract --xz --file shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz --directory /tmp
           sudo mv /tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck /usr/local/bin/
       - name: Run shellcheck
         shell: bash
