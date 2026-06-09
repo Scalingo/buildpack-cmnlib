@@ -18,7 +18,6 @@ jobs:
     name: "ShellCheck"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
       - uses: Scalingo/actions/shellcheck@feat/shellcheck
         with:
           shellcheck-severity: style
