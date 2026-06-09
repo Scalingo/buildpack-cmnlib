@@ -22,6 +22,6 @@ jobs:
       - uses: Scalingo/actions/shellcheck@feat/shellcheck
         with:
           shellcheck-severity: style
-          files:
-            - cmnlib.sh
+          files: |
+            cmnlib.sh
 ...
