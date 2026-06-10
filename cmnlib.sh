@@ -14,9 +14,6 @@
 #   They shouldn't be used outside of cmnlib.
 #
 
-# This is temporary, to test ShellCheck Github CI workflow.
-# We expect it to make ShellCheck complain:
-echo "${foo}"
 
 _CMN_VERSION_=20260320
 
