@@ -580,6 +580,9 @@ cmn::env::list() {
 		# For example: f="/app/env/MY_VAR" --> name="MY_VAR"
 		name="${f##*/}"
 
+		# Skip if not a valid name:
+		[[ "${name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
+
 		# Skip if in blocked:
 		[[ -n "${blocked[${name}]:-}" ]] && continue
 
