@@ -608,6 +608,7 @@ cmn::bp::run() {
 	local bpdir
 	local bpout
 	local tech=""
+	local clone_args=(--quiet --depth=1)
 
 	if ! bpdir="$( mktemp --directory --tmpdir="${tmpdir}" \
 			--quiet "buildpack-XXXXXX" )"
@@ -622,14 +623,15 @@ cmn::bp::run() {
 
 		cmn::task::start "Downloading buildpack"
 		local archive="${bpdir}/${url##*/}"
-		cmn::file::download "${url}" "${archive}" \
-			|| cmn::main::fail "${?}" <<-EOM
+		if ! cmn::file::download "${url}" "${archive}"; then
+			cmn::main::fail "${?}" <<-EOM
 				Unable to download the buildpack from ${url}.
 				Common errors include but are not limited to:
 				- Temporary network issue.
 				- Typo in the provided ULR.
 				- Using a URL that requires authentication.
 			EOM
+		fi
 		cmn::task::finish
 
 		cmn::task::start "Extracting buildpack code"
@@ -639,17 +641,22 @@ cmn::bp::run() {
 	else
 		cmn::task::start "Cloning buildpack"
 
+		if [[ -n "${branch}" ]]; then
+			clone_args+=(--branch "${branch}")
+		fi
+
 		# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
 		# instead of asking for credentials
 		GIT_TERMINAL_PROMPT=0 \
-		git clone --quiet --depth=1 "${url}" "${bpdir}" 2>/dev/null \
-			|| cmn::main::fail "${?}" <<-EOM
+		if ! git clone "${clone_args[@]}" "${url}" "${bpdir}" 2>/dev/null; then
+			cmn::main::fail "${?}" <<-EOM
 				Unable to clone the buildpack from ${url}.
 				Common errors include but are not limited to:
 				- Temporary network issue.
 				- Typo in the Git URL.
 				- Using a private repository.
 			EOM
+		fi
 		cmn::task::finish
 
 		if [[ -f "${bpdir}/.gitmodules" ]]; then
