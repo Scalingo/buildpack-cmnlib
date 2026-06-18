@@ -742,6 +742,8 @@ readonly -f cmn::file::validate_checksum
 readonly -f cmn::file::download
 readonly -f cmn::file::download_and_check
 
+readonly -f cmn::jobs::wait
+
 readonly -f cmn::env::read
 readonly -f cmn::env::list
 
