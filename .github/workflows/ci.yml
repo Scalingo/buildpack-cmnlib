@@ -28,5 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        bash: test/run
+      - name: Run tests
+        run: |
+          bash test/run
 ...
