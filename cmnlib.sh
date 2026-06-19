@@ -647,8 +647,9 @@ cmn::bp::run() {
 
 		# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
 		# instead of asking for credentials
-		GIT_TERMINAL_PROMPT=0 \
-		if ! git clone "${clone_args[@]}" "${url}" "${bpdir}" 2>/dev/null; then
+		if ! GIT_TERMINAL_PROMPT=0 \
+			git clone "${clone_args[@]}" "${url}" "${bpdir}" 2>/dev/null
+		then
 			cmn::main::fail "${?}" <<-EOM
 				Unable to clone the buildpack from ${url}.
 				Common errors include but are not limited to:
