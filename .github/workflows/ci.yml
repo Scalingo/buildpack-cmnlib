@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: Scalingo/actions/shellcheck@main
         with:
-          shellcheck-severity: style
+          severity: style
           files: |
             cmnlib.sh
 ...
