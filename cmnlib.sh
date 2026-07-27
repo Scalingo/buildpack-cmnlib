@@ -60,9 +60,10 @@ _cmn__output_emit() {
 	local -r fd="${1:-1}"
 	shift || true
 
+	# shellcheck disable=SC2312
 	while IFS= read -r line; do
 		printf '%s%s\n' "${prefix}" "${line}" >&"${fd}"
-	done < <(_cmn__read_lines "$@")
+	done < <( _cmn__read_lines "$@" )
 }
 
 _cmn__main_err() {
@@ -179,7 +180,7 @@ cmn::output::err() {
 	local -r prefix=" !! "
 	_cmn__output_emit "${prefix}" 2 "${@}"
 
-	if [ -n "${_CMN_DEBUG_:-}" ]; then
+	if [[ -n "${_CMN_DEBUG_:-}" ]]; then
 		cmn::output::traceback
 	fi
 }
@@ -205,6 +206,7 @@ cmn::output::debug() {
 		unset _CMN_IN_TASK_
 	fi
 
+	# shellcheck disable=SC2312
 	while IFS= read -r line; do
 		printf " *  %s: %s: %s: %s\n" \
 			"${BASH_SOURCE[1]}" \
@@ -224,8 +226,8 @@ cmn::output::traceback() {
 	for (( i=1; i<${#FUNCNAME[@]}; i++ )); do
 		>&2 printf " !!   %s: %s: %s\n" \
 			"${BASH_SOURCE[i]}" \
-			"${FUNCNAME[$i]}" \
-			"${BASH_LINENO[$i-1]}"
+			"${FUNCNAME[${i}]}" \
+			"${BASH_LINENO[${i}-1]}"
 	done
 }
 
@@ -480,10 +482,9 @@ cmn::file::download_and_check() {
 	cmn::file::download "${file_url}" "${file_path}" &
 	cmn::file::download "${hash_url}" "${hash_path}" &
 
-	if cmn::jobs::wait; then
-		cmn::file::validate_checksum "${file_path}" "${hash_path}"
-		rc="${?}"
-	fi
+	cmn::jobs::wait
+	cmn::file::validate_checksum "${file_path}" "${hash_path}"
+	rc="${?}"
 
 	return "${rc}"
 }
@@ -503,6 +504,7 @@ cmn::jobs::wait() {
 	local rc=0
 	local pid
 
+	# shellcheck disable=SC2312
 	while read -r pid; do
 		# If $pid is empty, skip to next loop item:
 		[[ -z "${pid}" ]] && continue
@@ -526,18 +528,24 @@ cmn::env::read() {
 # match the negative pattern are exported.
 #
 
-	local -r env_dir="${1}"
+	local rc=1
+	local -r envdir="${1}"
 	local e
 	local value
+	local env_vars
+
+	env_vars="$( cmn::env::list "${envdir}" )"
 
 	while IFS= read -r e; do
 		# Read env var value from file:
-		value="$( <"${env_dir}/${e}" )"
+		value="$( <"${envdir}/${e}" )"
 		# Remove potential ending new line:
 		value="${value%$'\n'}"
 		# Export the env var:
 		export "${e}=${value}"
-	done < <(cmn::env::list "${env_dir}")
+	done <<< "${env_vars}"
+
+	return "${rc}"
 }
 
 cmn::env::list() {
@@ -580,6 +588,9 @@ cmn::env::list() {
 		# For example: f="/app/env/MY_VAR" --> name="MY_VAR"
 		name="${f##*/}"
 
+		# Skip if not a valid name:
+		[[ "${name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
+
 		# Skip if in blocked:
 		[[ -n "${blocked[${name}]:-}" ]] && continue
 
@@ -605,6 +616,7 @@ cmn::bp::run() {
 	local bpdir
 	local bpout
 	local tech=""
+	local clone_args=(--quiet --depth=1)
 
 	if ! bpdir="$( mktemp --directory --tmpdir="${tmpdir}" \
 			--quiet "buildpack-XXXXXX" )"
@@ -619,14 +631,18 @@ cmn::bp::run() {
 
 		cmn::task::start "Downloading buildpack"
 		local archive="${bpdir}/${url##*/}"
-		cmn::file::download "${url}" "${archive}" \
-			|| cmn::main::fail "${?}" <<-EOM
+
+		# We want to handle cmn::file::download failures.
+		# shellcheck disable=SC2310
+		if ! cmn::file::download "${url}" "${archive}"; then
+			cmn::main::fail "${?}" <<-EOM
 				Unable to download the buildpack from ${url}.
 				Common errors include but are not limited to:
 				- Temporary network issue.
 				- Typo in the provided ULR.
 				- Using a URL that requires authentication.
 			EOM
+		fi
 		cmn::task::finish
 
 		cmn::task::start "Extracting buildpack code"
@@ -636,17 +652,23 @@ cmn::bp::run() {
 	else
 		cmn::task::start "Cloning buildpack"
 
+		if [[ -n "${branch}" ]]; then
+			clone_args+=(--branch "${branch}")
+		fi
+
 		# If the repo is not reachable, GIT_TERMINAL_PROMPT=0 allows us to fail
 		# instead of asking for credentials
-		GIT_TERMINAL_PROMPT=0 \
-		git clone --quiet --depth=1 "${url}" "${bpdir}" 2>/dev/null \
-			|| cmn::main::fail "${?}" <<-EOM
+		if ! GIT_TERMINAL_PROMPT=0 \
+			git clone "${clone_args[@]}" "${url}" "${bpdir}" 2>/dev/null
+		then
+			cmn::main::fail "${?}" <<-EOM
 				Unable to clone the buildpack from ${url}.
 				Common errors include but are not limited to:
 				- Temporary network issue.
 				- Typo in the Git URL.
 				- Using a private repository.
 			EOM
+		fi
 		cmn::task::finish
 
 		if [[ -f "${bpdir}/.gitmodules" ]]; then
@@ -741,6 +763,8 @@ readonly -f cmn::task::fail
 readonly -f cmn::file::validate_checksum
 readonly -f cmn::file::download
 readonly -f cmn::file::download_and_check
+
+readonly -f cmn::jobs::wait
 
 readonly -f cmn::env::read
 readonly -f cmn::env::list

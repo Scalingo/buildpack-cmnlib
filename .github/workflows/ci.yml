@@ -23,4 +23,12 @@ jobs:
           severity: style
           files: |
             cmnlib.sh
+  tests:
+    name: "Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: |
+          bash test/run
 ...

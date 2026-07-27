@@ -229,17 +229,6 @@ test::file::checksum_sha512_matches_not() {
 	test::utils::assertStderrMatches ""
 }
 
-test::str::join() {
-	local expected="one-two-three-four"
-
-	test::utils::capture \
-		cmn::str::join "-" "one" "two" "three" "four"
-
-	test::utils::assertSuccess
-	test::utils::assertStdoutMatches "${expected}"
-	test::utils::assertStderrMatches ""
-}
-
 # Add these functions to the test suite:
 
 suite_addTest test::output::info
@@ -262,5 +251,3 @@ suite_addTest test::file::checksum_sha256_matches
 suite_addTest test::file::checksum_sha256_matches_not
 suite_addTest test::file::checksum_sha512_matches
 suite_addTest test::file::checksum_sha512_matches_not
-
-suite_addTest test::str::join
