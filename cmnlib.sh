@@ -15,7 +15,7 @@
 #
 
 
-_CMN_VERSION_=20260320
+_CMN_VERSION_=20260727
 
 # If _CMN_LOADED_ is set, this means the library is already sourced.
 # As functions are readonly, we don't want to load it again, as this would
