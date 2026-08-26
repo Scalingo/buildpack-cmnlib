@@ -15,7 +15,7 @@
 #
 
 
-_CMN_VERSION_=20260825
+_CMN_VERSION_=20260826
 
 # If _CMN_LOADED_ is set, this means the library is already sourced.
 # As functions are readonly, we don't want to load it again, as this would
@@ -507,15 +507,22 @@ cmn::s3::upload() {
 	local -r key="${3#/}"		# Removes any leading slash
 	local -r dest="s3://${bucket}/${key}"
 
-	output="$( aws s3 cp \
-				"${file}" \
-				"${dest}" \
-				--acl public-read \
-				2>&1 )"
+	if [[ ! -f "${file}" ]]; then
+		printf "Unable to upload '%s': " \
+				"file is not local.\n" \
+				"${file}" >&2
+		rc=2
+	else
+		output="$( aws s3 cp \
+					"${file}" \
+					"${dest}" \
+					--acl public-read \
+					2>&1 )"
 
-	rc="${?}"
-	if (( rc != 0 )); then
-		printf "%s\n" "${output}" >&2
+		rc="${?}"
+		if (( rc != 0 )); then
+			printf "%s\n" "${output}" >&2
+		fi
 	fi
 
 	return "${rc}"
@@ -537,14 +544,23 @@ cmn::s3::download() {
 	local -r file="${3}"
 	local -r source="s3://${bucket}/${key}"
 
-	output="$( aws s3 cp \
-				"${source}" \
-				"${file}" \
-				2>&1 )"
+	local -r dir="$( dirname -- "${file}" )"
 
-	rc="${?}"
-	if (( rc != 0 )); then
-		printf "%s\n" "${output}" >&2
+	if [[ ! -d "${dir}" ]]; then
+		printf "Unable to download file to '%s': " \
+				"parent directory doesn't exist.\n" \
+				"${dir}" >&2
+		rc=2
+	else
+		output="$( aws s3 cp \
+					"${source}" \
+					"${file}" \
+					2>&1 )"
+
+		rc="${?}"
+		if (( rc != 0 )); then
+			printf "%s\n" "${output}" >&2
+		fi
 	fi
 
 	return "${rc}"
@@ -563,7 +579,7 @@ cmn::s3::list_bucket() {
 	local -r bucket="${1}"
 	local -r prefix="${2:-}"
 
-	aws s3api list-objects-v2 \
+	aws s3 list-objects-v2 \
 		--bucket "${bucket}" \
 		--prefix "${prefix}" \
 		--no-paginate
