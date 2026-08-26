@@ -572,6 +572,10 @@ cmn::s3::list_bucket() {
 # Optionally limits the output to objects matching the given prefix.
 # Output is in JSON.
 #
+# Note:
+#   Using `s3api` is a requirement to have a JSON output,
+#   which is more suitable for scripting purposes.
+#
 # $1: Name of the bucket to list
 # $2: (opt): Prefix
 #
@@ -579,7 +583,7 @@ cmn::s3::list_bucket() {
 	local -r bucket="${1}"
 	local -r prefix="${2:-}"
 
-	aws s3 list-objects-v2 \
+	aws s3api list-objects-v2 \
 		--bucket "${bucket}" \
 		--prefix "${prefix}" \
 		--no-paginate
