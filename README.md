@@ -346,15 +346,15 @@ reference="file.tar.gz.md5"
 
 cmn::task::start "Checking ${file} checksum"
 
-cmn::file::validate_checksum "${file}" "${reference}" \
-    || {
-        rm -f "${file}"
-        cmn::main::fail "${?}" <<- EOM
-            Checksums do not match!
-            '${file}' has been deleted, since it's most likely corrupt.
-            Aborting.
-            EOM
-    }
+if ! cmn::file::validate_checksum "${file}" "${reference}"; then
+    rc="${?}"
+    rm -f "${file}"
+    cmn::main::fail "${rc}" <<- EOM
+        Checksums do not match!
+        '${file}' has been deleted, since it's most likely corrupt.
+        Aborting.
+    EOM
+fi
 
 cmn::task::finish
 ```
@@ -373,11 +373,12 @@ output="${CACHE_DIR}/file.tar.gz"
 
 cmn::task::start "Downloading file.tar.gz"
 
-cmn::file::download "${file_url}" "${output}" \
-    || cmn::main::fail "${?}" <<- EOM
+if ! cmn::file::download "${file_url}" "${output}"; then
+    cmn::main::fail "${?}" <<- EOM
         Unable to download archive from '${file_url}'.
         Aborting.
-        EOM
+    EOM
+fi
 
 cmn::task::finish
 ```
@@ -407,13 +408,66 @@ hash_url="https://example.com/archive.tar.gz.sha256"
 file_path="${tmpdir}/archive.tar.gz"
 hash_path="${tmpdir}/archive.tar.gz.sha256"
 
-cmn::file::download_and_check "${file_url}" "${hash_url}" \
-    "${file_path}" "${hash_path}" \
-    || cmn::main::fail "${?}" <<- EOM
+if ! cmn::file::download_and_check "${file_url}" "${hash_url}" \
+    "${file_path}" "${hash_path}"
+then
+    cmn::main::fail "${?}" <<- EOM
         Could not safely download archive ${archive_version}!
-        EOM
+    EOM
+fi
 
 cmn::task::finish
+```
+</details>
+
+* * *
+
+### S3-storage Functions
+
+#### **`cmn::s3::upload`**
+
+Uploads a local file to an S3-compatible storage bucket.
+
+<details>
+<summary>Example</summary>
+
+```bash
+out="$( cmn::s3::upload "${path_to_file}" "${bucket}" "${key}" 2>&1 )"
+rc="${?}"
+
+if (( rc != 0 )); then
+    cmn::main::fail "${rc}" "${out}"
+fi
+```
+</details>
+
+#### **`cmn::s3::download`**
+
+Downloads a file from an S3-compatible storage bucket.
+
+<details>
+<summary>Example</summary>
+
+```bash
+out="$( cmn::s3::download "${bucket}" "${key}" "${path_to_file}" 2>&1 )"
+rc="${?}"
+
+if (( rc != 0 )); then
+    cmn::main::fail "${rc}" "${out}"
+fi
+```
+</details>
+
+#### **`cmn::s3::list_bucket`**
+
+Lists objects stored in an S3-compatible storage bucket.\
+Optionally limits the output to objects matching the given prefix.
+
+<details>
+<summary>Example</summary>
+
+```bash
+cmn::s3::list_bucket "${bucket}" "${prefix}"
 ```
 </details>
 
@@ -478,15 +532,17 @@ Git-clone a buildpack and runs it.
 bp_url="https://github.com/Scalingo/apt-buildpack.git"
 bp_output=""
 
-if ! bp_output="$( cmn::bp::run \
+if bp_output="$( cmn::bp::run \
     "${build_dir:?}" "${cache_dir:?}" "${env_dir:?}" \
-    "${tmp_dir:?}" "${bp_url}" )"
+    "${tmp_dir:?}" "${bp_url}" 2>&1 )"
 then
-    cmn::main::fail 2 <<- EOM
+    :
+else
+    cmn::main::fail "${?}" <<- EOM
         Failed to run apt-buildpack.
         Output:
         ${bp_output}
-        EOM
+    EOM
 fi
 ```
 </details>

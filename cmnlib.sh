@@ -15,7 +15,7 @@
 #
 
 
-_CMN_VERSION_=20260727
+_CMN_VERSION_=20260826
 
 # If _CMN_LOADED_ is set, this means the library is already sourced.
 # As functions are readonly, we don't want to load it again, as this would
@@ -490,6 +490,107 @@ cmn::file::download_and_check() {
 }
 
 
+
+cmn::s3::upload() {
+#
+# Uploads a local file to a S3-compatible storage bucket.
+#
+# $1: Path to the local file to upload
+# $2: Name of the bucket where to upload the file
+# $3: Key of the object (name of the file in the remote bucket)
+#
+
+	local rc
+	local output
+	local -r file="${1}"
+	local -r bucket="${2}"
+	local -r key="${3#/}"		# Removes any leading slash
+	local -r dest="s3://${bucket}/${key}"
+
+	if [[ ! -f "${file}" ]]; then
+		printf "Unable to upload '%s': " \
+				"file is not local.\n" \
+				"${file}" >&2
+		rc=2
+	else
+		output="$( aws s3 cp \
+					"${file}" \
+					"${dest}" \
+					--acl public-read \
+					2>&1 )"
+
+		rc="${?}"
+		if (( rc != 0 )); then
+			printf "%s\n" "${output}" >&2
+		fi
+	fi
+
+	return "${rc}"
+}
+
+cmn::s3::download() {
+#
+# Downloads a file from an S3-compatible storage bucket.
+#
+# $1: Name of the bucket where the file is stored
+# $2: Key of the object (name of the file in the remote bucket)
+# $3: Path to the local file
+#
+
+	local rc
+	local output
+	local -r bucket="${1}"
+	local -r key="${2#/}"		# Removes any leading slash
+	local -r file="${3}"
+	local -r source="s3://${bucket}/${key}"
+
+	local -r dir="$( dirname -- "${file}" )"
+
+	if [[ ! -d "${dir}" ]]; then
+		printf "Unable to download file to '%s': " \
+				"parent directory doesn't exist.\n" \
+				"${dir}" >&2
+		rc=2
+	else
+		output="$( aws s3 cp \
+					"${source}" \
+					"${file}" \
+					2>&1 )"
+
+		rc="${?}"
+		if (( rc != 0 )); then
+			printf "%s\n" "${output}" >&2
+		fi
+	fi
+
+	return "${rc}"
+}
+
+cmn::s3::list_bucket() {
+#
+# Lists the content of the given bucket.
+# Optionally limits the output to objects matching the given prefix.
+# Output is in JSON.
+#
+# Note:
+#   Using `s3api` is a requirement to have a JSON output,
+#   which is more suitable for scripting purposes.
+#
+# $1: Name of the bucket to list
+# $2: (opt): Prefix
+#
+
+	local -r bucket="${1}"
+	local -r prefix="${2:-}"
+
+	aws s3api list-objects-v2 \
+		--bucket "${bucket}" \
+		--prefix "${prefix}" \
+		--no-paginate
+}
+
+
+
 cmn::jobs::wait() {
 #
 # Waits for all child jobs running in background to finish.
@@ -707,10 +808,14 @@ cmn::bp::run() {
 	cmn::output::info "Detected technology: ${tech}"
 
 	cmn::task::start "Compiling"
-	if ! bpout="$( "${bpdir}/bin/compile" \
+	if bpout="$( "${bpdir}/bin/compile" \
 		"${builddir}" "${cachedir}" "${envdir}" 2>&1 )"
 	then
-		cmn::main::fail 2 <<-EOM
+		# Do nothing
+		# This syntax allows us to capture $? in the else block
+		:
+	else
+		cmn::main::fail "${?}" <<-EOM
 			An error occured while running the buildpack.
 			Here is the output:
 			${bpout}
@@ -763,6 +868,10 @@ readonly -f cmn::task::fail
 readonly -f cmn::file::validate_checksum
 readonly -f cmn::file::download
 readonly -f cmn::file::download_and_check
+
+readonly -f cmn::s3::upload
+readonly -f cmn::s3::download
+readonly -f cmn::s3::list_bucket
 
 readonly -f cmn::jobs::wait
 
