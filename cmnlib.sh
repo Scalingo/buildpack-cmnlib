@@ -411,6 +411,19 @@ _cmn__inventory_get() {
 		done < "${inventory_file}"
 	fi
 
+	if [[ "${rc}" -eq 1 ]]; then
+		# We couldn't find what's wanted.
+		cmn::output::err <<- EOM
+			Unable to find a ${field} for version ${wanted_version} in the inventory file.
+
+			If you believe this version is missing, please let us know:
+			- Reach out to our Support Team,
+			- Or open an issue for the corresponding buildpack.
+
+			Thanks, and happy deployments!
+		EOM
+	fi
+
 	return "${rc}"
 }
 
