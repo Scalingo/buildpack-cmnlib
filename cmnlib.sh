@@ -488,11 +488,11 @@ cmn::file::validate_checksum() {
 # md5, sha1, sha256, and sha512 hashing algorithm are currently supported.
 #
 # $1: file
-# $2: checksum file or hash
+# $2: checksum file OR checksum
 #
 
 	local -r file="${1}"
-	local -r hash="${2}"
+	local hash="${2}"
 
 	local rc=1
 
