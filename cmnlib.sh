@@ -15,7 +15,7 @@
 #
 
 
-_CMN_VERSION_=20260826
+_CMN_VERSION_=20260828
 
 # If _CMN_LOADED_ is set, this means the library is already sourced.
 # As functions are readonly, we don't want to load it again, as this would
@@ -367,6 +367,120 @@ cmn::task::fail() {
 
 
 
+_cmn__inventory_get() {
+#
+# Given a specific version, retrieves the corresponding given field from the
+# inventory file.
+#
+# $1: field to retrieve. Must be one of "version", "url" or "checksum".
+# $2: version
+# $3: inventory file
+#
+
+	local -r field="${1}"
+	local -r wanted_version="${2}"
+	local -r inventory_file="${3:-"INVENTORY.tsv"}"
+
+	local rc=0
+
+	case "${field}" in
+		version|url|checksum)
+			# Do nothing, value is OK.
+			;;
+		*)
+			rc=2
+			;;
+	esac
+
+	if [[ "${rc}" -eq 0 ]]; then
+		rc=1
+
+		# shellcheck disable=SC2034 # Yes, we may use version, url and checksum
+		while IFS=$'\t' read -r version url checksum; do
+			# Skip comments and blank lines
+			[[ -z "${version}" || "${version}" == \#* ]] && continue
+
+			if [[ "${version}" == "${wanted_version}" ]]; then
+				# Use Bash indirect variable expansion to retrieve the
+				# wanted field:
+				printf "%s\n" "${!field}"
+				rc=0
+				# Stop searching at first match:
+				break
+			fi
+		done < "${inventory_file}"
+	fi
+
+	return "${rc}"
+}
+
+cmn::inventory::get_url() {
+#
+# Given a specific version, retrieves the corresponding URL from the given
+# inventory file.
+#
+# $1: wanted version
+# $2: inventory file to search
+#
+
+	local -r wanted_version="${1}"
+	local -r inventory_file="${2:-"INVENTORY.tsv"}"
+
+	_cmn__inventory_get \
+		"url" \
+		"${wanted_version}" \
+		"${inventory_file}"
+}
+
+cmn::inventory::get_checksum() {
+#
+# Given a specific version, retrieves the corresponding checksum from the given
+# inventory file.
+#
+# $1: wanted version
+# $2: inventory file to search
+#
+
+	local -r wanted_version="${1}"
+	local -r inventory_file="${2:-"INVENTORY.tsv"}"
+
+	_cmn__inventory_get \
+		"checksum" \
+		"${wanted_version}" \
+		"${inventory_file}"
+}
+
+
+
+_cmn__file_read_checksum() {
+#
+# Reads file hash from the given checksum file.
+# Output format is <hashing_algorithm>:<hash>.
+#
+# Tips: use `cmn::file::validate_checksum` directly.
+#
+# $1: checksum file
+#
+
+	local -r file="${1}"
+
+	local -r hash_algo="${file##*.}"
+	local hash
+
+	# Reads the whole first line of $file
+	# Ensure this command never provokes an exit.
+	# (`read` returns 1 when the file misses a newline at EOF)
+	IFS= read -r line < "${file}" || true
+
+	# Trim starting whitespaces:
+	line=${line#"${line%%[![:space:]]*}"}
+
+	# Retrieves the string before the first whitespace:
+	hash=${line%%[[:space:]]*}
+
+	printf "%s:%s\n" "${hash_algo}" "${hash}"
+}
+
 cmn::file::validate_checksum() {
 #
 # Computes the checksum of a file and checks that it matches the one stored in
@@ -374,27 +488,25 @@ cmn::file::validate_checksum() {
 # md5, sha1, sha256, and sha512 hashing algorithm are currently supported.
 #
 # $1: file
-# $2: checksum file
+# $2: checksum file or hash
 #
 
 	local -r file="${1}"
-	local -r hash_file="${2}"
-
-	local -r hash_algo="${hash_file##*.}"
-	local ref_hash
-
-	# Reads the whole first line of hash_file
-	# Ensure this command never provokes an exit.
-	# (`read` returns 1 when the file misses a newline at EOF)
-	IFS= read -r line < "${hash_file}" || true
-
-	# Trim starting whitespaces:
-	line=${line#"${line%%[![:space:]]*}"}
-
-	# Retrieves the string before the first whitespace:
-	ref_hash=${line%%[[:space:]]*}
+	local -r hash="${2}"
 
 	local rc=1
+
+	# Check if given hash is a file.
+	# If so, we have to read it first and extract the reference hash from it.
+	if [[ -f "${hash}" ]]; then
+		hash="$( _cmn__file_read_checksum "${hash}" )"
+	fi
+
+	# Use Bash parameter expansion to split $hash in 2 parts:
+	# $hash_algo = longest match from beginning to a ':'
+	# $ref_hash = longest match from ':' to the end.
+	local -r hash_algo="${hash%%:*}"
+	local -r ref_hash="${hash##*:}"
 
 	case "${hash_algo}" in
 		"sha1")
@@ -424,7 +536,7 @@ cmn::file::validate_checksum() {
 
 	cmn::output::debug <<-EOM
 		file:      ${file}
-		hash_file: ${hash_file}
+		hash:      ${hash}
 		hash_algo: ${hash_algo}
 		ref_hash:  ${ref_hash}
 		result:    ${rc}
@@ -865,6 +977,9 @@ readonly -f cmn::task::start
 readonly -f cmn::task::finish
 readonly -f cmn::task::fail
 
+readonly -f cmn::inventory::get_url
+readonly -f cmn::inventory::get_checksum
+
 readonly -f cmn::file::validate_checksum
 readonly -f cmn::file::download
 readonly -f cmn::file::download_and_check
@@ -886,3 +1001,5 @@ readonly -f _cmn__main_err
 readonly -f _cmn__main_end
 readonly -f _cmn__trap_setup
 readonly -f _cmn__trap_teardown
+readonly -f _cmn__inventory_get
+readonly -f _cmn__file_read_checksum
