@@ -371,13 +371,18 @@ _cmn__inventory_get() {
 #
 # Given a specific version, retrieves the corresponding given field from the
 # inventory file.
-# When version is not set, and field is "default", retrieves the version set
-# as the default one in the inventory.
+# When version is not set, retrieves the field for the version set as the
+# default one in the inventory.
 #
 # $1: inventory file
-# $2: field to retrieve. Must be one of "version", "url", "checksum"
-#     or "default"
-# $3: (opt) version to retrieve
+# $2: field to retrieve. Must be one of "version", "url" or "checksum"
+# $3: (opt) version to retrieve. If not set, retrieves the field for the
+#     default version, if any.
+#
+# Returns:
+#   0: value found
+#   1: no matching entry found
+#   2: invalid arguments or unreadable inventory
 #
 
 	local inventory_file="${1}"
@@ -391,42 +396,34 @@ _cmn__inventory_get() {
 	# Check we have a valid $field:
 	case "${field}" in
 		version|url|checksum)
-			[[ -n "${wanted_version}" ]] || return 2
-			;;
-		default)
+			# These values are OK, do nothing
 			;;
 		*)
 			return 2
 			;;
 	esac
 
-	# Check $inventory_file is readable:
+	# Check inventory file is readable:
 	[[ -r "${inventory_file}" ]] || return 2
 
+	# Read inventory file line by line and map columns to variables
 	# shellcheck disable=SC2034
 	while IFS=$'\t' read -r version url checksum default; do
 		# Skip comments and blank lines
 		[[ -z "${version}" || "${version}" == \#* ]] && continue
 
-		case "${field}" in
-			default)
-				if [[ "${default}" == "default" ]]; then
-					printf "%s\n" "${version}"
-					return 0
-				fi
-				;;
-			version|url|checksum)
-				if [[ "${version}" == "${wanted_version}" ]]; then
-					# Use Bash indirect variable expansion to retrieve the
-					# wanted field:
-					printf "%s\n" "${!field}"
-					return 0
-				fi
-				;;
-			*)
-				# Do nothing
-				;;
-		esac
+		if [[ -n "${wanted_version}" ]]; then
+			# Skip instructions and go on with the next line
+			# if current version is not the one we're looking for:
+			[[ "${version}" == "${wanted_version}" ]] || continue
+		else
+			# Skip instructions and go on with the next line
+			# if current row is not the default one:
+			[[ "${default}" == "default" ]] || continue
+		fi
+
+		printf '%s\n' "${!field}"
+		return 0
 	done < "${inventory_file}"
 
 	# If we reach this line, we haven't found what we're looking for:
@@ -442,7 +439,7 @@ cmn::inventory::get_default() {
 
 	_cmn__inventory_get \
 		"${inventory_file}" \
-		"default"
+		"version"
 }
 
 cmn::inventory::get_url() {
@@ -455,9 +452,7 @@ cmn::inventory::get_url() {
 #
 
 	local -r inventory_file="${1}"
-	# shellcheck disable=SC2312 # We don't want this assignment to fail
-	local -r wanted_version="${2:-$( cmn::inventory::get_default \
-										"${inventory_file}" )}"
+	local -r wanted_version="${2:-}"
 
 	# Return if no version was specified and we weren't able to retrieve a
 	# default one.
@@ -479,9 +474,7 @@ cmn::inventory::get_checksum() {
 #
 
 	local -r inventory_file="${1}"
-	# shellcheck disable=SC2312 # We don't want this assignment to fail
-	local -r wanted_version="${2:-$( cmn::inventory::get_default \
-										"${inventory_file}" )}"
+	local -r wanted_version="${2:-}"
 
 	# Return if no version was specified and we weren't able to retrieve a
 	# default one.
