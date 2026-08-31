@@ -371,60 +371,78 @@ _cmn__inventory_get() {
 #
 # Given a specific version, retrieves the corresponding given field from the
 # inventory file.
+# When version is not set, and field is "default", retrieves the version set
+# as the default one in the inventory.
 #
-# $1: field to retrieve. Must be one of "version", "url" or "checksum".
-# $2: version
-# $3: inventory file
+# $1: inventory file
+# $2: field to retrieve. Must be one of "version", "url", "checksum"
+#     or "default"
+# $3: (opt) version to retrieve
 #
 
-	local -r field="${1}"
-	local -r wanted_version="${2}"
-	local -r inventory_file="${3:-"INVENTORY.tsv"}"
+	local inventory_file="${1}"
+	local field="${2}"
+	local wanted_version="${3:-}"
+	local version
+	local url
+	local checksum
+	local default
 
-	local rc=0
-
+	# Check we have a valid $field:
 	case "${field}" in
 		version|url|checksum)
-			# Do nothing, value is OK.
+			[[ -n "${wanted_version}" ]] || return 2
+			;;
+		default)
 			;;
 		*)
-			rc=2
+			return 2
 			;;
 	esac
 
-	if [[ "${rc}" -eq 0 ]]; then
-		rc=1
+	# Check $inventory_file is readable:
+	[[ -r "${inventory_file}" ]] || return 2
 
-		# shellcheck disable=SC2034 # Yes, we may use version, url and checksum
-		while IFS=$'\t' read -r version url checksum; do
-			# Skip comments and blank lines
-			[[ -z "${version}" || "${version}" == \#* ]] && continue
+	# shellcheck disable=SC2034
+	while IFS=$'\t' read -r version url checksum default; do
+		# Skip comments and blank lines
+		[[ -z "${version}" || "${version}" == \#* ]] && continue
 
-			if [[ "${version}" == "${wanted_version}" ]]; then
-				# Use Bash indirect variable expansion to retrieve the
-				# wanted field:
-				printf "%s\n" "${!field}"
-				rc=0
-				# Stop searching at first match:
-				break
-			fi
-		done < "${inventory_file}"
-	fi
+		case "${field}" in
+			default)
+				if [[ "${default}" == "default" ]]; then
+					printf "%s\n" "${version}"
+					return 0
+				fi
+				;;
+			version|url|checksum)
+				if [[ "${version}" == "${wanted_version}" ]]; then
+					# Use Bash indirect variable expansion to retrieve the
+					# wanted field:
+					printf "%s\n" "${!field}"
+					return 0
+				fi
+				;;
+			*)
+				# Do nothing
+				;;
+		esac
+	done < "${inventory_file}"
 
-	if [[ "${rc}" -eq 1 ]]; then
-		# We couldn't find what's wanted.
-		cmn::output::err <<- EOM
-			Unable to find a ${field} for version ${wanted_version} in the inventory file.
+	# If we reach this line, we haven't found what we're looking for:
+	return 1
+}
 
-			If you believe this version is missing, please let us know:
-			- Reach out to our Support Team,
-			- Or open an issue for the corresponding buildpack.
+cmn::inventory::get_default() {
+#
+# Retrieves the default version from the inventory file.
+#
 
-			Thanks, and happy deployments!
-		EOM
-	fi
+	local -r inventory_file="${1}"
 
-	return "${rc}"
+	_cmn__inventory_get \
+		"${inventory_file}" \
+		"default"
 }
 
 cmn::inventory::get_url() {
@@ -432,17 +450,23 @@ cmn::inventory::get_url() {
 # Given a specific version, retrieves the corresponding URL from the given
 # inventory file.
 #
-# $1: wanted version
-# $2: inventory file to search
+# $1: inventory file to search
+# $2: wanted version, defaults to version set as default in inventory
 #
 
-	local -r wanted_version="${1}"
-	local -r inventory_file="${2:-"INVENTORY.tsv"}"
+	local -r inventory_file="${1}"
+	# shellcheck disable=SC2312 # We don't want this assignment to fail
+	local -r wanted_version="${2:-$( cmn::inventory::get_default \
+										"${inventory_file}" )}"
 
-	_cmn__inventory_get \
+	# Return if no version was specified and we weren't able to retrieve a
+	# default one.
+	[[ -n "${wanted_version}" ]] || return 2
+	
+	cmn__inventory_get \
+		"${inventory_file}" \
 		"url" \
-		"${wanted_version}" \
-		"${inventory_file}"
+		"${wanted_version}"
 }
 
 cmn::inventory::get_checksum() {
@@ -450,17 +474,23 @@ cmn::inventory::get_checksum() {
 # Given a specific version, retrieves the corresponding checksum from the given
 # inventory file.
 #
-# $1: wanted version
-# $2: inventory file to search
+# $1: inventory file to search
+# $2: wanted version, defaults to version set as default in inventory
 #
 
-	local -r wanted_version="${1}"
-	local -r inventory_file="${2:-"INVENTORY.tsv"}"
+	local -r inventory_file="${1}"
+	# shellcheck disable=SC2312 # We don't want this assignment to fail
+	local -r wanted_version="${2:-$( cmn::inventory::get_default \
+										"${inventory_file}" )}"
 
-	_cmn__inventory_get \
+	# Return if no version was specified and we weren't able to retrieve a
+	# default one.
+	[[ -n "${wanted_version}" ]] || return 2
+	
+	cmn__inventory_get \
+		"${inventory_file}" \
 		"checksum" \
-		"${wanted_version}" \
-		"${inventory_file}"
+		"${wanted_version}"
 }
 
 
