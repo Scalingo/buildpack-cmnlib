@@ -328,6 +328,32 @@ Calls [`cmn::ouput::err`](#cmnoutputerr) with `$1` when `$1` is set.
 
 * * *
 
+### Inventory Functions
+
+> [!NOTE]
+> `cmn::inventory` functions expect the inventory to be a TSV file.
+  Each row must have 3 columns: version, URL and checksum.
+  The default row has an additional fourth column, whose value MUST be set to
+  `default`. The inventory file must have only one default row.
+
+#### **`cmn::inventory::get_default`**
+
+Retrieves the version set as default from the inventory file.
+
+#### **`cmn::inventory::get_url`**
+
+Given a specific version, retrieves the corresponding URL from the given
+inventory file.
+If no version is specified, tries to fallback on the default version.
+
+#### **`cmn::inventory::get_checksum`**
+
+Given a specific version, retrieves the corresponding checksum from the given
+inventory file.
+If no version is specified, tries to fallback on the default version.
+
+* * *
+
 ### File Functions
 
 #### **`cmn::file::validate_checksum`**

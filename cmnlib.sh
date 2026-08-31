@@ -15,7 +15,7 @@
 #
 
 
-_CMN_VERSION_=20260826
+_CMN_VERSION_=20260828
 
 # If _CMN_LOADED_ is set, this means the library is already sourced.
 # As functions are readonly, we don't want to load it again, as this would
@@ -367,6 +367,156 @@ cmn::task::fail() {
 
 
 
+_cmn__inventory_get() {
+#
+# Given a specific version, retrieves the corresponding given field from the
+# inventory file.
+# When version is not set, retrieves the field for the version set as the
+# default one in the inventory.
+#
+# $1: inventory file
+# $2: field to retrieve. Must be one of "version", "url" or "checksum"
+# $3: (opt) version to retrieve. If not set, retrieves the field for the
+#     default version, if any.
+#
+# Returns:
+#   0: value found
+#   1: no matching entry found
+#   2: invalid arguments or unreadable inventory
+#
+
+	local inventory_file="${1}"
+	local field="${2}"
+	local wanted_version="${3:-}"
+	local version
+	local url
+	local checksum
+	local default
+
+	# Check we have a valid $field:
+	case "${field}" in
+		version|url|checksum)
+			# These values are OK, do nothing
+			;;
+		*)
+			return 2
+			;;
+	esac
+
+	# Check inventory file is readable:
+	[[ -r "${inventory_file}" ]] || return 2
+
+	# Read inventory file line by line and map columns to variables
+	# shellcheck disable=SC2034
+	while IFS=$'\t' read -r version url checksum default; do
+		# Skip comments and blank lines
+		[[ -z "${version}" || "${version}" == \#* ]] && continue
+
+		if [[ -n "${wanted_version}" ]]; then
+			# Skip instructions and go on with the next line
+			# if current version is not the one we're looking for:
+			[[ "${version}" == "${wanted_version}" ]] || continue
+		else
+			# Skip instructions and go on with the next line
+			# if current row is not the default one:
+			[[ "${default}" == "default" ]] || continue
+		fi
+
+		printf '%s\n' "${!field}"
+		return 0
+	done < "${inventory_file}"
+
+	# If we reach this line, we haven't found what we're looking for:
+	return 1
+}
+
+cmn::inventory::get_default() {
+#
+# Retrieves the default version from the inventory file.
+#
+
+	local -r inventory_file="${1}"
+
+	_cmn__inventory_get \
+		"${inventory_file}" \
+		"version"
+}
+
+cmn::inventory::get_url() {
+#
+# Given a specific version, retrieves the corresponding URL from the given
+# inventory file.
+#
+# $1: inventory file to search
+# $2: wanted version, defaults to version set as default in inventory
+#
+
+	local -r inventory_file="${1}"
+	local -r wanted_version="${2:-}"
+
+	# Return if no version was specified and we weren't able to retrieve a
+	# default one.
+	[[ -n "${wanted_version}" ]] || return 2
+	
+	cmn__inventory_get \
+		"${inventory_file}" \
+		"url" \
+		"${wanted_version}"
+}
+
+cmn::inventory::get_checksum() {
+#
+# Given a specific version, retrieves the corresponding checksum from the given
+# inventory file.
+#
+# $1: inventory file to search
+# $2: wanted version, defaults to version set as default in inventory
+#
+
+	local -r inventory_file="${1}"
+	local -r wanted_version="${2:-}"
+
+	# Return if no version was specified and we weren't able to retrieve a
+	# default one.
+	[[ -n "${wanted_version}" ]] || return 2
+	
+	cmn__inventory_get \
+		"${inventory_file}" \
+		"checksum" \
+		"${wanted_version}"
+}
+
+
+
+_cmn__file_read_checksum() {
+#
+# Reads file hash from the given checksum file.
+# Output format is <hashing_algorithm>:<hash>.
+#
+# Tips: use `cmn::file::validate_checksum` directly.
+#
+# $1: checksum file
+#
+
+	local -r file="${1}"
+
+	local -r hash_algo="${file##*.}"
+	local hash
+
+	# Reads the whole first line of $file
+	# Ensure this command never provokes an exit.
+	# (`read` returns 1 when the file misses a newline at EOF)
+	IFS= read -r line < "${file}" || true
+
+	# Trim starting whitespaces:
+	line=${line#"${line%%[![:space:]]*}"}
+
+	# Retrieves the string before the first whitespace:
+	hash=${line%%[[:space:]]*}
+
+	printf "%s:%s\n" "${hash_algo}" "${hash}"
+}
+
 cmn::file::validate_checksum() {
 #
 # Computes the checksum of a file and checks that it matches the one stored in
@@ -374,27 +524,25 @@ cmn::file::validate_checksum() {
 # md5, sha1, sha256, and sha512 hashing algorithm are currently supported.
 #
 # $1: file
-# $2: checksum file
+# $2: checksum file OR checksum
 #
 
 	local -r file="${1}"
-	local -r hash_file="${2}"
-
-	local -r hash_algo="${hash_file##*.}"
-	local ref_hash
-
-	# Reads the whole first line of hash_file
-	# Ensure this command never provokes an exit.
-	# (`read` returns 1 when the file misses a newline at EOF)
-	IFS= read -r line < "${hash_file}" || true
-
-	# Trim starting whitespaces:
-	line=${line#"${line%%[![:space:]]*}"}
-
-	# Retrieves the string before the first whitespace:
-	ref_hash=${line%%[[:space:]]*}
+	local hash="${2}"
 
 	local rc=1
+
+	# Check if given hash is a file.
+	# If so, we have to read it first and extract the reference hash from it.
+	if [[ -f "${hash}" ]]; then
+		hash="$( _cmn__file_read_checksum "${hash}" )"
+	fi
+
+	# Use Bash parameter expansion to split $hash in 2 parts:
+	# $hash_algo = longest match from beginning to a ':'
+	# $ref_hash = longest match from ':' to the end.
+	local -r hash_algo="${hash%%:*}"
+	local -r ref_hash="${hash##*:}"
 
 	case "${hash_algo}" in
 		"sha1")
@@ -424,7 +572,7 @@ cmn::file::validate_checksum() {
 
 	cmn::output::debug <<-EOM
 		file:      ${file}
-		hash_file: ${hash_file}
+		hash:      ${hash}
 		hash_algo: ${hash_algo}
 		ref_hash:  ${ref_hash}
 		result:    ${rc}
@@ -865,6 +1013,10 @@ readonly -f cmn::task::start
 readonly -f cmn::task::finish
 readonly -f cmn::task::fail
 
+readonly -f cmn::inventory::get_default
+readonly -f cmn::inventory::get_url
+readonly -f cmn::inventory::get_checksum
+
 readonly -f cmn::file::validate_checksum
 readonly -f cmn::file::download
 readonly -f cmn::file::download_and_check
@@ -886,3 +1038,5 @@ readonly -f _cmn__main_err
 readonly -f _cmn__main_end
 readonly -f _cmn__trap_setup
 readonly -f _cmn__trap_teardown
+readonly -f _cmn__inventory_get
+readonly -f _cmn__file_read_checksum
