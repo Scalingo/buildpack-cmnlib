@@ -1020,6 +1020,7 @@ readonly -f cmn::task::start
 readonly -f cmn::task::finish
 readonly -f cmn::task::fail
 
+readonly -f cmn::inventory::get_default
 readonly -f cmn::inventory::get_url
 readonly -f cmn::inventory::get_checksum
 
