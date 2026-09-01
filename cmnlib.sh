@@ -458,7 +458,7 @@ cmn::inventory::get_url() {
 	# default one.
 	[[ -n "${wanted_version}" ]] || return 2
 	
-	cmn__inventory_get \
+	_cmn__inventory_get \
 		"${inventory_file}" \
 		"url" \
 		"${wanted_version}"
