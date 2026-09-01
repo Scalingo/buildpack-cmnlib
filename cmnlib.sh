@@ -15,7 +15,7 @@
 #
 
 
-_CMN_VERSION_=20260828
+_CMN_VERSION_=20260831
 
 # If _CMN_LOADED_ is set, this means the library is already sourced.
 # As functions are readonly, we don't want to load it again, as this would
@@ -777,13 +777,14 @@ cmn::env::read() {
 # match the negative pattern are exported.
 #
 
-	local rc=1
 	local -r envdir="${1}"
 	local e
 	local value
 	local env_vars
-
+	
 	env_vars="$( cmn::env::list "${envdir}" )"
+
+	[[ -n "${env_vars}" ]] || return 0
 
 	while IFS= read -r e; do
 		# Read env var value from file:
@@ -793,8 +794,6 @@ cmn::env::read() {
 		# Export the env var:
 		export "${e}=${value}"
 	done <<< "${env_vars}"
-
-	return "${rc}"
 }
 
 cmn::env::list() {
