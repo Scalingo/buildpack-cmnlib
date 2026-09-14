@@ -19,9 +19,10 @@
    1. Click [Releases]
    2. Click the [Draft a new release][draft] button
    3. Fill the form:
-      1. Select the tag you've just created
-      2. Add a release title. Format MUST be "Version <tag>"
-      3. Copy and paste the following template for the changelog.
+      1. Select the tag you've just created.
+      2. Add a release title. Format MUST be "Version <tag>".
+      3. Copy and paste the following template for the changelog and edit it
+         accordingly (remove any useless sections).
       4. Click the "Publish release" button.
 
 ```md
