@@ -577,3 +577,6 @@ fi
 ## Creating a New Release of cmnlib
 
 See [RELEASING.md].
+
+
+[RELEASING.md]: RELEASING.md
