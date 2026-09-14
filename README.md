@@ -572,3 +572,8 @@ else
 fi
 ```
 </details>
+
+
+## Creating a New Release of cmnlib
+
+See [RELEASING.md].
